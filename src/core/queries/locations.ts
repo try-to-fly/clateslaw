@@ -28,15 +28,14 @@ export const LOCATIONS_QUERIES = {
     location_visits AS (
       SELECT
         a.id,
-        COALESCE(g.name, a.name) AS name,
+        a.name,
         a.city,
         a.state,
         a.country,
         COUNT(*) AS visit_count
       FROM all_locations al
       JOIN addresses a ON a.id = al.address_id
-      LEFT JOIN geofences g ON ST_Contains(g.geofence, a.position)
-      GROUP BY a.id, g.name, a.name, a.city, a.state, a.country
+      GROUP BY a.id, a.name, a.city, a.state, a.country
     ),
     charge_stats AS (
       SELECT

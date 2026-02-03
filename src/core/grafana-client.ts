@@ -114,10 +114,13 @@ export class GrafanaClient {
       return response;
     } catch (error) {
       if (error instanceof HTTPError) {
+        const bodyText = typeof error.response.body === 'string'
+          ? error.response.body
+          : JSON.stringify(error.response.body);
         throw new GrafanaApiError(
-          `Grafana API error: ${error.response.statusCode}`,
+          `Grafana API error: ${error.response.statusCode} - ${bodyText}`,
           error.response.statusCode,
-          String(error.response.body)
+          bodyText
         );
       }
       throw error;

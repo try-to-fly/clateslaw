@@ -29,3 +29,6 @@ dist/
 
 # misc
 .DS_Store
+
+# collected data
+data/

@@ -51,25 +51,26 @@ export const EFFICIENCY_QUERIES = {
   /** 获取按温度分组的效率 */
   efficiencyByTemperature: `
     SELECT
-      ROUND(AVG(outside_temp)::numeric, 0) AS temperature,
-      ROUND(AVG(distance)::numeric, 1) AS avg_distance,
+      ROUND(p.outside_temp::numeric, 0) AS temperature,
+      ROUND(AVG(d.distance)::numeric, 1) AS avg_distance,
       ROUND(
         AVG(
-          CASE WHEN distance > 0 THEN
-            (start_rated_range_km - end_rated_range_km) * cars.efficiency / distance
+          CASE WHEN d.distance > 0 THEN
+            (d.start_rated_range_km - d.end_rated_range_km) * cars.efficiency / d.distance
           ELSE NULL END
         )::numeric,
         3
       ) AS efficiency_ratio
-    FROM drives
-    INNER JOIN cars ON cars.id = car_id
+    FROM drives d
+    INNER JOIN cars ON cars.id = d.car_id
+    LEFT JOIN positions p ON p.id = d.start_position_id
     WHERE
-      car_id = $car_id
-      AND distance >= $min_distance
-      AND outside_temp IS NOT NULL
-      AND start_rated_range_km IS NOT NULL
-      AND end_rated_range_km IS NOT NULL
-    GROUP BY ROUND(outside_temp::numeric, 0)
+      d.car_id = $car_id
+      AND d.distance >= $min_distance
+      AND p.outside_temp IS NOT NULL
+      AND d.start_rated_range_km IS NOT NULL
+      AND d.end_rated_range_km IS NOT NULL
+    GROUP BY ROUND(p.outside_temp::numeric, 0)
     ORDER BY temperature
   `,
 } as const;

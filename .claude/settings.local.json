@@ -5,7 +5,8 @@
       "WebFetch(domain:medium.com)",
       "Bash(tree:*)",
       "Bash(pnpm remove:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(pnpm run collect)"
     ]
   }
 }

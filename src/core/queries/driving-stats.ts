@@ -5,8 +5,8 @@ export const DRIVING_STATS_QUERIES = {
       COUNT(*) AS total_drives,
       COALESCE(SUM(distance), 0) AS total_distance,
       COALESCE(SUM(duration_min), 0) AS total_duration_min,
-      COALESCE(AVG(speed_avg), 0) AS avg_speed,
-      COALESCE(MAX(speed_max), 0) AS max_speed
+      COALESCE(SUM(distance) / NULLIF(SUM(duration_min), 0) * 60, 0) AS avg_speed,
+      0 AS max_speed
     FROM drives
     WHERE car_id = $car_id
       AND end_date IS NOT NULL
@@ -27,7 +27,7 @@ export const DRIVING_STATS_QUERIES = {
       COALESCE(SUM((start_rated_range_km - end_rated_range_km) * cars.efficiency), 0) AS total_energy_consumed
     FROM drives
     INNER JOIN cars ON drives.car_id = cars.id
-    WHERE car_id = $car_id
+    WHERE drives.car_id = $car_id
       AND end_date IS NOT NULL
       AND start_rated_range_km IS NOT NULL
       AND end_rated_range_km IS NOT NULL
