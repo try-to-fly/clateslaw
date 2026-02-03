@@ -3,7 +3,7 @@ import { useTheme } from '../hooks/useTheme';
 import { DriveCard } from '../components/cards/DriveCard';
 import { StatsCard } from '../components/cards/StatsCard';
 import { DriveRoute } from '../components/maps/DriveRoute';
-import { formatDate, formatSpeed, formatPower } from '../lib/utils';
+import { formatDate, formatSpeed, formatPower, formatDuration } from '../lib/utils';
 
 export default function DrivePage() {
   const data = useData<DriveData>();
@@ -34,6 +34,7 @@ export default function DrivePage() {
         title="详细信息"
         theme={theme}
         items={[
+          { label: '驾驶时长', value: formatDuration(drive.duration_min) },
           { label: '开始时间', value: formatDate(drive.start_date) },
           { label: '结束时间', value: formatDate(drive.end_date) },
           { label: '最高速度', value: formatSpeed(drive.speed_max) },
