@@ -156,16 +156,21 @@ async function takeScreenshot(
       (window as any).__TESLA_DATA__ = injectedData;
     }, data);
 
-    await page.goto(url, { waitUntil: 'networkidle2' });
+    console.log('正在加载页面...');
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    console.log('页面 DOM 加载完成');
 
     // 等待内容渲染
+    console.log('等待内容渲染...');
     await page.waitForSelector('#root > div', { timeout: 10000 });
 
     // 等待地图加载完成（如果页面有地图）
+    console.log('等待地图加载...');
     try {
       await page.waitForSelector('[data-map-ready="true"]', { timeout: 8000 });
+      console.log('地图加载完成');
     } catch {
-      // 页面可能没有地图，忽略超时
+      console.log('页面无地图或地图加载超时，继续执行');
     }
 
     // 等待一小段时间确保页面完全渲染
