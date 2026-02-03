@@ -6,7 +6,8 @@
       "Bash(tree:*)",
       "Bash(pnpm remove:*)",
       "Bash(npm run build:*)",
-      "Bash(pnpm run collect)"
+      "Bash(pnpm run collect)",
+      "Bash(pnpm test:run)"
     ]
   }
 }
