@@ -6,6 +6,30 @@ import type {
   QueryOptions,
 } from '../types/grafana.js';
 
+/**
+ * 解析 Grafana 相对时间格式为 ISO 时间戳
+ * 支持: now, now-Nd, now-Nh, now-Nm, now-Ns
+ */
+export function parseGrafanaTime(timeStr: string): string {
+  if (timeStr === 'now') {
+    return new Date().toISOString();
+  }
+
+  const match = timeStr.match(/^now-(\d+)([dhms])$/);
+  if (match) {
+    const [, amount, unit] = match;
+    const ms: Record<string, number> = {
+      d: 86400000,
+      h: 3600000,
+      m: 60000,
+      s: 1000,
+    };
+    return new Date(Date.now() - parseInt(amount) * ms[unit]).toISOString();
+  }
+
+  return timeStr;
+}
+
 /** 默认数据源配置 */
 const DEFAULT_DATASOURCE: GrafanaDataSource = {
   type: 'grafana-postgresql-datasource',
