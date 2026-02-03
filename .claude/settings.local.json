@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:community.grafana.com)",
+      "WebFetch(domain:medium.com)"
+    ]
+  }
+}
