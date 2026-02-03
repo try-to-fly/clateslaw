@@ -15,7 +15,9 @@
       "Bash(pnpm typecheck:*)",
       "Bash(pnpm tsc:*)",
       "Bash(pnpm lint:*)",
-      "WebFetch(domain:pptr.dev)"
+      "WebFetch(domain:pptr.dev)",
+      "Bash(ls:*)",
+      "WebFetch(domain:lbs.amap.com)"
     ]
   }
 }
