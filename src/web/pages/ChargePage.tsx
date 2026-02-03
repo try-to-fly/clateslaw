@@ -27,7 +27,7 @@ export default function ChargePage() {
     : 'theme-card rounded-lg overflow-hidden';
 
   return (
-    <div className="theme-bg p-4 space-y-4">
+    <div className="theme-bg p-4 space-y-4 screenshot-container">
       <ChargeCard charge={charge} theme={theme} />
 
       <div className={cardClass}>

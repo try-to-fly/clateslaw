@@ -20,7 +20,7 @@ export default function DrivePage() {
   const { drive, positions } = data;
 
   return (
-    <div className="theme-bg p-4 space-y-4">
+    <div className="theme-bg p-4 space-y-4 screenshot-container">
       <DriveCard drive={drive} theme={theme} />
 
       <DriveRoute

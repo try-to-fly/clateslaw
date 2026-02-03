@@ -36,7 +36,7 @@ export default function DailyPage() {
     : 'bg-[rgba(255,255,255,0.05)]';
 
   return (
-    <div className="theme-bg p-4 space-y-4">
+    <div className="theme-bg p-4 space-y-4 screenshot-container">
       <div className={cardClass}>
         <div className="px-4 py-3">
           <h3 className="text-base font-medium theme-text">

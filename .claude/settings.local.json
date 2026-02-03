@@ -14,7 +14,8 @@
       "Bash(pnpm dev:*)",
       "Bash(pnpm typecheck:*)",
       "Bash(pnpm tsc:*)",
-      "Bash(pnpm lint:*)"
+      "Bash(pnpm lint:*)",
+      "WebFetch(domain:pptr.dev)"
     ]
   }
 }

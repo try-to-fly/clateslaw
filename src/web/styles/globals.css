@@ -38,3 +38,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* 截图模式下的固定宽度容器 */
+.screenshot-container {
+  width: var(--screenshot-width, 402px);
+  min-width: var(--screenshot-width, 402px);
+  max-width: var(--screenshot-width, 402px);
+}

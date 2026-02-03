@@ -134,12 +134,21 @@ async function takeScreenshot(
   try {
     const page = await browser.newPage();
 
+    // 设置初始视口，高度设置较大以减少视口调整次数
     await page.setViewport({
       width,
-      height: 800,
+      height: 2000,
       deviceScaleFactor: scale,
     });
 
+    // 注入 CSS 变量设置固定宽度
+    await page.evaluateOnNewDocument((w) => {
+      document.addEventListener('DOMContentLoaded', () => {
+        document.documentElement.style.setProperty('--screenshot-width', `${w}px`);
+      });
+    }, width);
+
+    // 注入数据
     await page.evaluateOnNewDocument((injectedData) => {
       (window as any).__TESLA_DATA__ = injectedData;
     }, data);
@@ -159,46 +168,24 @@ async function takeScreenshot(
     // 等待一小段时间确保页面完全渲染
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // 获取页面实际高度（使用多种方式取最大值）
-    const bodyHeight = await page.evaluate(() => {
-      const body = document.body;
-      const html = document.documentElement;
-      const root = document.getElementById('root');
-      return Math.max(
-        body.scrollHeight,
-        body.offsetHeight,
-        html.clientHeight,
-        html.scrollHeight,
-        html.offsetHeight,
-        root?.scrollHeight || 0,
-        root?.offsetHeight || 0
-      );
-    });
+    // 获取容器元素
+    const container = await page.$('#root > div');
+    if (!container) {
+      throw new Error('Container element not found');
+    }
 
-    console.log(`页面高度: ${bodyHeight}px`);
+    // 获取容器实际尺寸
+    const boundingBox = await container.boundingBox();
+    if (!boundingBox) {
+      throw new Error('Failed to get container bounding box');
+    }
 
-    // 重新设置视口高度
-    await page.setViewport({
-      width,
-      height: Math.max(bodyHeight, 600),
-      deviceScaleFactor: scale,
-    });
+    console.log(`容器尺寸: ${boundingBox.width}x${boundingBox.height}`);
 
-    // 再等待一下确保视口调整后的重绘完成
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    console.log(`视口: ${width}x${Math.max(bodyHeight, 600)}, scale: ${scale}`);
-
-    // 截图 - 使用 clip 确保宽度正确
-    await page.screenshot({
+    // 使用元素截图替代 clip，避免 deviceScaleFactor 兼容问题
+    await container.screenshot({
       path: outputPath,
       type: 'png',
-      clip: {
-        x: 0,
-        y: 0,
-        width,
-        height: Math.max(bodyHeight, 600),
-      },
     });
 
     console.log(`截图已保存: ${outputPath}`);
