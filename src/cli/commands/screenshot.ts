@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import puppeteer from 'puppeteer';
 import handler from 'serve-handler';
 import { getGrafanaClient, DriveService, ChargeService } from '../../core/index.js';
+import { config } from '../../config/index.js';
 import type { DriveRecord, DrivePosition } from '../../types/drive.js';
 import type { ChargeRecord, ChargeCurvePoint } from '../../types/charge.js';
 
@@ -213,14 +214,14 @@ async function sendAndCleanup(
 ): Promise<void> {
   if (!options.send) return;
 
-  const target = options.target || '1023102490';
+  const target = options.target || config.openclaw.target;
   const message = options.message || defaultMessage;
 
   console.log(`正在发送截图到 Telegram...`);
 
   try {
     await execAsync(
-      `openclaw message send --channel telegram --target ${target} --message "${message}" --media "${outputPath}"`
+      `openclaw message send --channel ${config.openclaw.channel} --target ${target} --message "${message}" --media "${outputPath}"`
     );
     console.log('发送成功');
 
@@ -424,7 +425,7 @@ export const screenshotCommand = new Command('screenshot')
       .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
       .option('-c, --car-id <number>', 'Car ID', '1')
       .option('-s, --send', '发送到 Telegram 后删除文件')
-      .option('-t, --target <id>', 'Telegram 目标 ID', '1023102490')
+      .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
       .option('-m, --message <text>', '自定义消息')
       .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
       .action(screenshotDrive)
@@ -438,7 +439,7 @@ export const screenshotCommand = new Command('screenshot')
       .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
       .option('-c, --car-id <number>', 'Car ID', '1')
       .option('-s, --send', '发送到 Telegram 后删除文件')
-      .option('-t, --target <id>', 'Telegram 目标 ID', '1023102490')
+      .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
       .option('-m, --message <text>', '自定义消息')
       .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
       .action(screenshotCharge)
@@ -452,7 +453,7 @@ export const screenshotCommand = new Command('screenshot')
       .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
       .option('-c, --car-id <number>', 'Car ID', '1')
       .option('-s, --send', '发送到 Telegram 后删除文件')
-      .option('-t, --target <id>', 'Telegram 目标 ID', '1023102490')
+      .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
       .option('-m, --message <text>', '自定义消息')
       .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
       .action(screenshotDaily)

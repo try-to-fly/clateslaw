@@ -13,6 +13,10 @@ export const config = {
     url: requireEnv("GRAFANA_URL"),
     token: requireEnv("GRAFANA_TOKEN"),
   },
+  openclaw: {
+    channel: requireEnv("OPENCLAW_CHANNEL"),
+    target: requireEnv("OPENCLAW_TARGET"),
+  },
 } as const;
 
 export type Config = typeof config;
