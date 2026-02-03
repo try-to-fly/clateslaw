@@ -35,20 +35,36 @@ function generateDemoPositions(): DrivePosition[] {
     { lat: 39.9842, lng: 116.2980 }, // 海淀区终点
   ];
 
+  // 预设速度序列，模拟真实驾驶场景：起步-加速-高速-减速-等红灯-再加速-到达
+  const speedPattern = [
+    10,   // 0: 起步
+    25,   // 1: 加速中
+    45,   // 2: 城市道路
+    65,   // 3: 快速路入口
+    90,   // 4: 快速路
+    105,  // 5: 快速路高速
+    95,   // 6: 快速路
+    85,   // 7: 准备下匝道
+    55,   // 8: 匝道
+    35,   // 9: 等红灯前减速
+    5,    // 10: 等红灯
+    20,   // 11: 起步
+    50,   // 12: 城市道路
+    70,   // 13: 加速
+    85,   // 14: 较快
+    60,   // 15: 减速
+    40,   // 16: 接近目的地
+    25,   // 17: 减速
+    15,   // 18: 找车位
+    0,    // 19: 停车
+  ];
+
   for (let i = 0; i < pointCount; i++) {
     const progress = i / (pointCount - 1);
     const time = startTime + duration * progress;
     const point = route[i];
 
-    // 模拟速度变化：起步慢、中间快、结束慢
-    let speed: number;
-    if (progress < 0.1) {
-      speed = Math.round(20 + progress * 400);
-    } else if (progress > 0.9) {
-      speed = Math.round(60 - (progress - 0.9) * 400);
-    } else {
-      speed = Math.round(50 + Math.sin(progress * Math.PI) * 50);
-    }
+    const speed = speedPattern[i];
 
     // 模拟功率变化
     const power = Math.round(speed * 1.2 + Math.random() * 20);
