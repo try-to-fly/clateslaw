@@ -22,4 +22,21 @@ export const DRIVE_QUERIES = {
     ORDER BY d.start_date DESC
     LIMIT $limit
   `,
+
+  /** 获取行程的 GPS 轨迹数据 */
+  positions: `
+    SELECT
+      p.latitude,
+      p.longitude,
+      p.date,
+      p.battery_level,
+      p.speed,
+      p.power,
+      p.odometer
+    FROM positions p
+    WHERE p.car_id = $car_id
+      AND p.date >= (SELECT start_date FROM drives WHERE id = $drive_id)
+      AND p.date <= (SELECT end_date FROM drives WHERE id = $drive_id)
+    ORDER BY p.date ASC
+  `,
 } as const;

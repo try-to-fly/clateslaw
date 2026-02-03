@@ -20,4 +20,20 @@ export const CHARGE_QUERIES = {
     ORDER BY cp.start_date DESC
     LIMIT $limit
   `,
+
+  /** 获取充电过程的详细曲线数据 */
+  curve: `
+    SELECT
+      c.date,
+      c.battery_level,
+      c.usable_battery_level,
+      c.charger_power,
+      c.charger_voltage,
+      c.charger_actual_current,
+      c.charge_energy_added,
+      c.rated_battery_range_km
+    FROM charges c
+    WHERE c.charging_process_id = $charging_process_id
+    ORDER BY c.date ASC
+  `,
 } as const;

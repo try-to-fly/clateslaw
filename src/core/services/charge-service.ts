@@ -1,4 +1,4 @@
-import type { ChargeRecord, ChargeQueryParams } from '../../types/charge.js';
+import type { ChargeRecord, ChargeQueryParams, ChargeCurvePoint } from '../../types/charge.js';
 import type { GrafanaClient } from '../grafana-client.js';
 import { CHARGE_QUERIES } from '../queries/charges.js';
 
@@ -14,6 +14,15 @@ export class ChargeService {
     return this.client.query<ChargeRecord>(CHARGE_QUERIES.list, {
       variables: { car_id: carId, limit },
       timeRange: { from, to },
+    });
+  }
+
+  /**
+   * 获取充电过程的详细曲线数据
+   */
+  async getChargeCurve(chargeId: number): Promise<ChargeCurvePoint[]> {
+    return this.client.query<ChargeCurvePoint>(CHARGE_QUERIES.curve, {
+      variables: { charging_process_id: chargeId },
     });
   }
 }

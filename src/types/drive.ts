@@ -18,3 +18,14 @@ export interface DriveQueryParams {
   to?: string;
   limit?: number;
 }
+
+/** GPS 位置点 */
+export interface DrivePosition {
+  latitude: number;
+  longitude: number;
+  date: string;
+  battery_level: number;
+  speed: number;
+  power: number;
+  odometer: number;
+}

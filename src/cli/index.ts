@@ -15,6 +15,7 @@ import { visitedCommand } from './commands/visited.js';
 import { projectedRangeCommand } from './commands/projected-range.js';
 import { statsCommand } from './commands/stats/index.js';
 import { detailCommand } from './commands/detail/index.js';
+import { screenshotCommand } from './commands/screenshot.js';
 
 const program = new Command();
 
@@ -139,5 +140,6 @@ program
 
 program.addCommand(statsCommand);
 program.addCommand(detailCommand);
+program.addCommand(screenshotCommand);
 
 export { program };

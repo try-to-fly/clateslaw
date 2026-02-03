@@ -32,3 +32,4 @@ dist/
 
 # collected data
 data/
+*.png

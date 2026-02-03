@@ -32,6 +32,7 @@ const CONFIG = {
   limits: {
     records: 100,
     topLocations: 10,
+    detailRecords: 10, // 采集详细数据的记录数
   },
 };
 
@@ -260,6 +261,45 @@ class DataCollector {
         this.statsService.getPeriodStats({ carId: car.id, ...period })
       ),
     ]);
+
+    // 采集详细数据（GPS 轨迹和充电曲线）
+    await this.collectDetailedData(car, carDir);
+  }
+
+  private async collectDetailedData(car: Car, carDir: string): Promise<void> {
+    const { detailRecords } = CONFIG.limits;
+
+    // 获取最近的行程记录
+    const drivesFile = `${carDir}/drives/records.json`;
+    if (fs.existsSync(drivesFile)) {
+      const drives = JSON.parse(fs.readFileSync(drivesFile, 'utf-8')) as Array<{ id: number }>;
+      const drivesToCollect = drives.slice(0, detailRecords);
+
+      console.log(`  📍 采集 ${drivesToCollect.length} 条行程的 GPS 轨迹...`);
+      for (const drive of drivesToCollect) {
+        await this.collect(
+          `drives/positions/${drive.id}`,
+          `${carDir}/drives/positions/${drive.id}.json`,
+          () => this.driveService.getDrivePositions(car.id, drive.id)
+        );
+      }
+    }
+
+    // 获取最近的充电记录
+    const chargesFile = `${carDir}/charges/records.json`;
+    if (fs.existsSync(chargesFile)) {
+      const charges = JSON.parse(fs.readFileSync(chargesFile, 'utf-8')) as Array<{ id: number }>;
+      const chargesToCollect = charges.slice(0, detailRecords);
+
+      console.log(`  🔋 采集 ${chargesToCollect.length} 条充电的曲线数据...`);
+      for (const charge of chargesToCollect) {
+        await this.collect(
+          `charges/curves/${charge.id}`,
+          `${carDir}/charges/curves/${charge.id}.json`,
+          () => this.chargeService.getChargeCurve(charge.id)
+        );
+      }
+    }
   }
 
   private generateMetadata(cars: Car[]): Metadata {
