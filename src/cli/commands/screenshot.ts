@@ -156,7 +156,7 @@ async function takeScreenshot(
       (window as any).__TESLA_DATA__ = injectedData;
     }, data);
 
-    await page.goto(url, { waitUntil: 'networkidle0' });
+    await page.goto(url, { waitUntil: 'networkidle2' });
 
     // 等待内容渲染
     await page.waitForSelector('#root > div', { timeout: 10000 });
