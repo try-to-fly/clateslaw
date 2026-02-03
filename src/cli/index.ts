@@ -3,6 +3,18 @@ import { carsCommand } from './commands/cars.js';
 import { carCommand } from './commands/car.js';
 import { chargesCommand } from './commands/charges.js';
 import { drivesCommand } from './commands/drives.js';
+import { batteryCommand } from './commands/battery.js';
+import { efficiencyCommand } from './commands/efficiency.js';
+import { statesCommand } from './commands/states.js';
+import { updatesCommand } from './commands/updates.js';
+import { mileageCommand } from './commands/mileage.js';
+import { vampireCommand } from './commands/vampire.js';
+import { locationsCommand } from './commands/locations.js';
+import { timelineCommand } from './commands/timeline.js';
+import { visitedCommand } from './commands/visited.js';
+import { projectedRangeCommand } from './commands/projected-range.js';
+import { statsCommand } from './commands/stats/index.js';
+import { detailCommand } from './commands/detail/index.js';
 
 const program = new Command();
 
@@ -40,5 +52,92 @@ program
   .option('-t, --to <date>', 'End time', 'now')
   .option('-l, --limit <number>', 'Record limit', '50')
   .action(drivesCommand);
+
+program
+  .command('battery <car-id>')
+  .description('Battery health and statistics')
+  .option('-o, --output <format>', 'Output format: table | json', 'table')
+  .action(batteryCommand);
+
+program
+  .command('efficiency <car-id>')
+  .description('Efficiency analysis')
+  .option('-o, --output <format>', 'Output format: table | json', 'table')
+  .option('--min-distance <km>', 'Minimum distance for temperature analysis', '5')
+  .action(efficiencyCommand);
+
+program
+  .command('states <car-id>')
+  .description('Vehicle state history')
+  .option('-o, --output <format>', 'Output format: table | json', 'table')
+  .option('-f, --from <date>', 'Start time', 'now-30d')
+  .option('-t, --to <date>', 'End time', 'now')
+  .option('-l, --limit <number>', 'Record limit', '50')
+  .action(statesCommand);
+
+program
+  .command('updates <car-id>')
+  .description('Software update history')
+  .option('-o, --output <format>', 'Output format: table | json', 'table')
+  .option('-f, --from <date>', 'Start time', 'now-1y')
+  .option('-t, --to <date>', 'End time', 'now')
+  .option('-l, --limit <number>', 'Record limit', '50')
+  .action(updatesCommand);
+
+program
+  .command('mileage <car-id>')
+  .description('Mileage statistics')
+  .option('-o, --output <format>', 'Output format: table | json', 'table')
+  .option('-f, --from <date>', 'Start time', 'now-30d')
+  .option('-t, --to <date>', 'End time', 'now')
+  .action(mileageCommand);
+
+program
+  .command('vampire <car-id>')
+  .description('Vampire drain analysis')
+  .option('-o, --output <format>', 'Output format: table | json', 'table')
+  .option('-f, --from <date>', 'Start time', 'now-90d')
+  .option('-t, --to <date>', 'End time', 'now')
+  .option('--min-duration <minutes>', 'Minimum idle duration in minutes', '60')
+  .action(vampireCommand);
+
+program
+  .command('locations <car-id>')
+  .description('Location statistics')
+  .option('-o, --output <format>', 'Output format: table | json', 'table')
+  .option('-f, --from <date>', 'Start time', 'now-1y')
+  .option('-t, --to <date>', 'End time', 'now')
+  .option('--top <number>', 'Number of top locations', '10')
+  .action(locationsCommand);
+
+program
+  .command('timeline <car-id>')
+  .description('Activity timeline')
+  .option('-o, --output <format>', 'Output format: table | json', 'table')
+  .option('-f, --from <date>', 'Start time', 'now-7d')
+  .option('-t, --to <date>', 'End time', 'now')
+  .option('-l, --limit <number>', 'Record limit', '50')
+  .action(timelineCommand);
+
+program
+  .command('visited <car-id>')
+  .description('Visited places')
+  .option('-o, --output <format>', 'Output format: table | json', 'table')
+  .option('-f, --from <date>', 'Start time', 'now-1y')
+  .option('-t, --to <date>', 'End time', 'now')
+  .option('--top <number>', 'Number of places', '20')
+  .action(visitedCommand);
+
+program
+  .command('projected-range <car-id>')
+  .description('Projected range analysis')
+  .option('-o, --output <format>', 'Output format: table | json', 'table')
+  .option('-f, --from <date>', 'Start time', 'now-30d')
+  .option('-t, --to <date>', 'End time', 'now')
+  .option('-l, --limit <number>', 'Record limit', '30')
+  .action(projectedRangeCommand);
+
+program.addCommand(statsCommand);
+program.addCommand(detailCommand);
 
 export { program };

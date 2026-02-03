@@ -1,3 +1,14 @@
 export { CarService } from './car-service.js';
 export { ChargeService } from './charge-service.js';
 export { DriveService } from './drive-service.js';
+export { SettingsService } from './settings-service.js';
+export { BatteryService } from './battery-service.js';
+export { StatsService } from './stats-service.js';
+export { EfficiencyService } from './efficiency-service.js';
+export { StateService } from './state-service.js';
+export { UpdateService } from './update-service.js';
+export { MileageService } from './mileage-service.js';
+export { VampireService } from './vampire-service.js';
+export { LocationService } from './location-service.js';
+export { TimelineService } from './timeline-service.js';
+export { ProjectedRangeService } from './projected-range-service.js';

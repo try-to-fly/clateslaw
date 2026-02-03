@@ -52,7 +52,7 @@ export class GrafanaClient {
   /**
    * 执行 SQL 查询并返回解析后的数据
    */
-  async query<T extends Record<string, unknown>>(
+  async query<T>(
     rawSql: string,
     options: QueryOptions = {}
   ): Promise<T[]> {
@@ -127,7 +127,7 @@ export class GrafanaClient {
   /**
    * 解析 Grafana 响应为对象数组
    */
-  private parseResponse<T extends Record<string, unknown>>(
+  private parseResponse<T>(
     data: GrafanaQueryResponse
   ): T[] {
     const result = data.results?.A;
