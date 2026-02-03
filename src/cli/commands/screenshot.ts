@@ -267,9 +267,9 @@ async function getDailyData(carId: number, dateStr: string): Promise<DailyData> 
 
   const date = new Date(dateStr);
   const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
+  startOfDay.setUTCHours(0, 0, 0, 0);
   const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
+  endOfDay.setUTCHours(23, 59, 59, 999);
 
   const from = startOfDay.toISOString();
   const to = endOfDay.toISOString();
