@@ -1,5 +1,12 @@
 import type { DriveRecord, DrivePosition } from '../../types/drive';
 import type { ChargeRecord, ChargeCurvePoint } from '../../types/charge';
+import type { HomeData } from '../demo/home';
+import {
+  demoHomeData,
+  demoDriveData,
+  demoChargeData,
+  demoDailyData,
+} from '../demo';
 
 declare global {
   interface Window {
@@ -29,10 +36,31 @@ export interface DailyData {
   };
 }
 
-export type TeslaData = DriveData | ChargeData | DailyData;
+export type TeslaData = DriveData | ChargeData | DailyData | HomeData;
+
+function getDemoData(): TeslaData | null {
+  if (!import.meta.env.DEV) {
+    return null;
+  }
+
+  const path = window.location.pathname;
+
+  if (path === '/') return demoHomeData;
+  if (path.startsWith('/drive')) return demoDriveData;
+  if (path.startsWith('/charge')) return demoChargeData;
+  if (path.startsWith('/daily')) return demoDailyData;
+
+  return null;
+}
 
 export function useData<T extends TeslaData>(): T | null {
-  return (window.__TESLA_DATA__ as T) ?? null;
+  // Puppeteer 注入的数据优先
+  if (window.__TESLA_DATA__) {
+    return window.__TESLA_DATA__ as T;
+  }
+
+  // 开发模式下使用 demo 数据
+  return getDemoData() as T | null;
 }
 
 export function isDriveData(data: TeslaData): data is DriveData {

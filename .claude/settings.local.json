@@ -11,7 +11,10 @@
       "Bash(pnpm approve-builds)",
       "Bash(pnpm build:web)",
       "Bash(pnpm build:cli)",
-      "Bash(pnpm dev:*)"
+      "Bash(pnpm dev:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm tsc:*)",
+      "Bash(pnpm lint:*)"
     ]
   }
 }
