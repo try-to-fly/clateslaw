@@ -1,5 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { cn } from '../../lib/utils';
+import type { ThemeType } from '../../hooks/useTheme';
 
 interface StatsCardProps {
   title: string;
@@ -10,30 +9,32 @@ interface StatsCardProps {
     highlight?: boolean;
   }>;
   className?: string;
+  theme?: ThemeType;
 }
 
-export function StatsCard({ title, items, className }: StatsCardProps) {
+export function StatsCard({ title, items, className, theme = 'tesla' }: StatsCardProps) {
+  const cardClass = theme === 'cyberpunk'
+    ? 'theme-card cyber-border rounded-lg overflow-hidden'
+    : theme === 'glass'
+    ? 'theme-card glass-card rounded-xl overflow-hidden'
+    : 'theme-card rounded-lg overflow-hidden';
+
   return (
-    <Card className={className}>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {items.map((item, index) => (
-            <div key={index} className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">{item.label}</span>
-              <span className={cn(
-                'font-medium',
-                item.highlight && 'text-primary'
-              )}>
-                {item.value}
-                {item.unit && <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>}
-              </span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+    <div className={`${cardClass} ${className || ''}`}>
+      <div className="px-4 py-3 border-b border-[var(--theme-card-border)]">
+        <h3 className="text-sm font-medium theme-text">{title}</h3>
+      </div>
+      <div className="p-4 space-y-2">
+        {items.map((item, index) => (
+          <div key={index} className="flex justify-between items-center">
+            <span className="text-sm theme-text-muted">{item.label}</span>
+            <span className={item.highlight ? 'font-medium theme-accent' : 'font-medium theme-text'}>
+              {item.value}
+              {item.unit && <span className="text-xs theme-text-muted ml-1">{item.unit}</span>}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

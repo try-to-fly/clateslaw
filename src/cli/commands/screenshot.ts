@@ -2,6 +2,8 @@ import { Command } from 'commander';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as http from 'node:http';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import puppeteer from 'puppeteer';
 import handler from 'serve-handler';
 import { getGrafanaClient, DriveService, ChargeService } from '../../core/index.js';
@@ -42,12 +44,49 @@ interface DailyData {
 
 const DEFAULT_WIDTH = 402;
 const DEFAULT_SCALE = 3;
+const execAsync = promisify(exec);
+
+function getNewestMtime(dir: string): number {
+  let newest = 0;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      newest = Math.max(newest, getNewestMtime(fullPath));
+    } else {
+      const stat = fs.statSync(fullPath);
+      newest = Math.max(newest, stat.mtimeMs);
+    }
+  }
+  return newest;
+}
+
+async function ensureWebBuild(): Promise<string> {
+  const cwd = process.cwd();
+  const distPath = path.resolve(cwd, 'dist/web');
+  const srcWebPath = path.resolve(cwd, 'src/web');
+
+  const needsBuild = !fs.existsSync(distPath) ||
+    getNewestMtime(srcWebPath) > getNewestMtime(distPath);
+
+  if (needsBuild) {
+    console.log('检测到 Web 源码更新，正在打包...');
+    await execAsync('pnpm build:web', { cwd });
+    console.log('打包完成');
+  }
+
+  return distPath;
+}
 
 interface ScreenshotOptions {
   output?: string;
   width?: string;
   scale?: string;
   carId?: string;
+  send?: boolean;
+  target?: string;
+  message?: string;
+  theme?: string;
 }
 
 async function startServer(distPath: string): Promise<http.Server> {
@@ -109,28 +148,87 @@ async function takeScreenshot(
     // 等待内容渲染
     await page.waitForSelector('#root > div', { timeout: 10000 });
 
-    // 获取页面实际高度
+    // 等待地图加载完成（如果页面有地图）
+    try {
+      await page.waitForSelector('[data-map-ready="true"]', { timeout: 8000 });
+    } catch {
+      // 页面可能没有地图，忽略超时
+    }
+
+    // 等待一小段时间确保页面完全渲染
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // 获取页面实际高度（使用多种方式取最大值）
     const bodyHeight = await page.evaluate(() => {
-      return document.body.scrollHeight;
+      const body = document.body;
+      const html = document.documentElement;
+      const root = document.getElementById('root');
+      return Math.max(
+        body.scrollHeight,
+        body.offsetHeight,
+        html.clientHeight,
+        html.scrollHeight,
+        html.offsetHeight,
+        root?.scrollHeight || 0,
+        root?.offsetHeight || 0
+      );
     });
+
+    console.log(`页面高度: ${bodyHeight}px`);
 
     // 重新设置视口高度
     await page.setViewport({
       width,
-      height: bodyHeight,
+      height: Math.max(bodyHeight, 600),
       deviceScaleFactor: scale,
     });
 
-    // 截图
+    // 再等待一下确保视口调整后的重绘完成
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    console.log(`视口: ${width}x${Math.max(bodyHeight, 600)}, scale: ${scale}`);
+
+    // 截图 - 使用 clip 确保宽度正确
     await page.screenshot({
       path: outputPath,
-      fullPage: true,
       type: 'png',
+      clip: {
+        x: 0,
+        y: 0,
+        width,
+        height: Math.max(bodyHeight, 600),
+      },
     });
 
     console.log(`截图已保存: ${outputPath}`);
   } finally {
     await browser.close();
+  }
+}
+
+async function sendAndCleanup(
+  outputPath: string,
+  options: ScreenshotOptions,
+  defaultMessage: string
+): Promise<void> {
+  if (!options.send) return;
+
+  const target = options.target || '1023102490';
+  const message = options.message || defaultMessage;
+
+  console.log(`正在发送截图到 Telegram...`);
+
+  try {
+    await execAsync(
+      `openclaw message send --channel telegram --target ${target} --message "${message}" --media "${outputPath}"`
+    );
+    console.log('发送成功');
+
+    fs.unlinkSync(outputPath);
+    console.log(`已清理: ${outputPath}`);
+  } catch (error) {
+    console.error('发送失败:', error instanceof Error ? error.message : error);
+    console.log(`截图保留在: ${outputPath}`);
   }
 }
 
@@ -219,22 +317,21 @@ async function screenshotDrive(
   const data = await getDriveData(carId, driveId);
   const outputPath = options.output || `drive-${driveId}.png`;
 
-  const distPath = path.resolve(process.cwd(), 'dist/web');
-  if (!fs.existsSync(distPath)) {
-    throw new Error('Web dist not found. Run "pnpm build:web" first.');
-  }
+  const distPath = await ensureWebBuild();
 
   const server = await startServer(distPath);
   const port = getServerPort(server);
 
   try {
+    const theme = options.theme || 'tesla';
     await takeScreenshot(
-      `http://localhost:${port}/drive`,
+      `http://localhost:${port}/drive?theme=${theme}`,
       data,
       outputPath,
       width,
       scale
     );
+    await sendAndCleanup(outputPath, options, `行程 #${driveId} 截图`);
   } finally {
     server.close();
   }
@@ -264,22 +361,21 @@ async function screenshotCharge(
   const data = await getChargeData(carId, chargeId);
   const outputPath = options.output || `charge-${chargeId}.png`;
 
-  const distPath = path.resolve(process.cwd(), 'dist/web');
-  if (!fs.existsSync(distPath)) {
-    throw new Error('Web dist not found. Run "pnpm build:web" first.');
-  }
+  const distPath = await ensureWebBuild();
 
   const server = await startServer(distPath);
   const port = getServerPort(server);
 
   try {
+    const theme = options.theme || 'tesla';
     await takeScreenshot(
-      `http://localhost:${port}/charge`,
+      `http://localhost:${port}/charge?theme=${theme}`,
       data,
       outputPath,
       width,
       scale
     );
+    await sendAndCleanup(outputPath, options, `充电 #${chargeId} 截图`);
   } finally {
     server.close();
   }
@@ -297,22 +393,21 @@ async function screenshotDaily(
   const data = await getDailyData(carId, date);
   const outputPath = options.output || `daily-${date}.png`;
 
-  const distPath = path.resolve(process.cwd(), 'dist/web');
-  if (!fs.existsSync(distPath)) {
-    throw new Error('Web dist not found. Run "pnpm build:web" first.');
-  }
+  const distPath = await ensureWebBuild();
 
   const server = await startServer(distPath);
   const port = getServerPort(server);
 
   try {
+    const theme = options.theme || 'tesla';
     await takeScreenshot(
-      `http://localhost:${port}/daily`,
+      `http://localhost:${port}/daily?theme=${theme}`,
       data,
       outputPath,
       width,
       scale
     );
+    await sendAndCleanup(outputPath, options, `${date} 日报截图`);
   } finally {
     server.close();
   }
@@ -328,6 +423,10 @@ export const screenshotCommand = new Command('screenshot')
       .option('-w, --width <number>', 'Viewport width', String(DEFAULT_WIDTH))
       .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
       .option('-c, --car-id <number>', 'Car ID', '1')
+      .option('-s, --send', '发送到 Telegram 后删除文件')
+      .option('-t, --target <id>', 'Telegram 目标 ID', '1023102490')
+      .option('-m, --message <text>', '自定义消息')
+      .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
       .action(screenshotDrive)
   )
   .addCommand(
@@ -338,6 +437,10 @@ export const screenshotCommand = new Command('screenshot')
       .option('-w, --width <number>', 'Viewport width', String(DEFAULT_WIDTH))
       .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
       .option('-c, --car-id <number>', 'Car ID', '1')
+      .option('-s, --send', '发送到 Telegram 后删除文件')
+      .option('-t, --target <id>', 'Telegram 目标 ID', '1023102490')
+      .option('-m, --message <text>', '自定义消息')
+      .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
       .action(screenshotCharge)
   )
   .addCommand(
@@ -348,5 +451,9 @@ export const screenshotCommand = new Command('screenshot')
       .option('-w, --width <number>', 'Viewport width', String(DEFAULT_WIDTH))
       .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
       .option('-c, --car-id <number>', 'Car ID', '1')
+      .option('-s, --send', '发送到 Telegram 后删除文件')
+      .option('-t, --target <id>', 'Telegram 目标 ID', '1023102490')
+      .option('-m, --message <text>', '自定义消息')
+      .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
       .action(screenshotDaily)
   );

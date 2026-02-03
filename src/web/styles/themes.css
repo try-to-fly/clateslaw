@@ -1,0 +1,113 @@
+/* 默认主题变量 (Tesla) */
+:root {
+  --theme-bg: #0a0a0a;
+  --theme-bg-secondary: #1a1a1a;
+  --theme-card: #1a1a1a;
+  --theme-card-border: #2a2a2a;
+  --theme-accent: #e82127;
+  --theme-accent-secondary: #ff3b3b;
+  --theme-text: #ffffff;
+  --theme-text-secondary: #888888;
+  --theme-text-muted: #666666;
+  --theme-success: #22c55e;
+  --theme-error: #ef4444;
+  --theme-gradient: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+  --theme-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Tesla 主题 - 深黑背景 + 红色强调色 */
+[data-theme="tesla"] {
+  --theme-bg: #0a0a0a;
+  --theme-bg-secondary: #1a1a1a;
+  --theme-card: #1a1a1a;
+  --theme-card-border: #2a2a2a;
+  --theme-accent: #e82127;
+  --theme-accent-secondary: #ff3b3b;
+  --theme-text: #ffffff;
+  --theme-text-secondary: #888888;
+  --theme-text-muted: #666666;
+  --theme-success: #22c55e;
+  --theme-error: #ef4444;
+  --theme-gradient: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+  --theme-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Cyberpunk 主题 - 霓虹渐变、发光效果 */
+[data-theme="cyberpunk"] {
+  --theme-bg: #0f0f23;
+  --theme-bg-secondary: #1a1a3e;
+  --theme-card: rgba(26, 26, 62, 0.9);
+  --theme-card-border: #3d3d6b;
+  --theme-accent: #00f5ff;
+  --theme-accent-secondary: #ff00ff;
+  --theme-text: #ffffff;
+  --theme-text-secondary: #00f5ff;
+  --theme-text-muted: #8888aa;
+  --theme-success: #00ff88;
+  --theme-error: #ff0055;
+  --theme-gradient: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #2d1b4e 100%);
+  --theme-card-shadow: 0 0 20px rgba(0, 245, 255, 0.15);
+  --theme-glow: 0 0 10px currentColor;
+}
+
+/* Glass 主题 - 毛玻璃效果 */
+[data-theme="glass"] {
+  --theme-bg: #0f172a;
+  --theme-bg-secondary: #1e293b;
+  --theme-card: rgba(255, 255, 255, 0.08);
+  --theme-card-border: rgba(255, 255, 255, 0.1);
+  --theme-accent: #3b82f6;
+  --theme-accent-secondary: #60a5fa;
+  --theme-text: #ffffff;
+  --theme-text-secondary: #94a3b8;
+  --theme-text-muted: #64748b;
+  --theme-success: #22c55e;
+  --theme-error: #ef4444;
+  --theme-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  --theme-card-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --theme-blur: blur(12px);
+}
+
+/* 主题通用样式 */
+.theme-bg {
+  background: var(--theme-gradient);
+  min-height: 100%;
+}
+
+.theme-card {
+  background: var(--theme-card);
+  border: 1px solid var(--theme-card-border);
+  box-shadow: var(--theme-card-shadow);
+}
+
+.theme-text {
+  color: var(--theme-text);
+}
+
+.theme-text-secondary {
+  color: var(--theme-text-secondary);
+}
+
+.theme-text-muted {
+  color: var(--theme-text-muted);
+}
+
+.theme-accent {
+  color: var(--theme-accent);
+}
+
+/* Cyberpunk 特殊效果 */
+[data-theme="cyberpunk"] .cyber-glow {
+  text-shadow: var(--theme-glow);
+}
+
+[data-theme="cyberpunk"] .cyber-border {
+  position: relative;
+  border: 1px solid var(--theme-card-border);
+}
+
+/* Glass 特殊效果 */
+[data-theme="glass"] .glass-card {
+  backdrop-filter: var(--theme-blur);
+  -webkit-backdrop-filter: var(--theme-blur);
+}

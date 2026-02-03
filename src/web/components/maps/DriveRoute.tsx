@@ -1,15 +1,16 @@
 import { useCallback } from 'react';
 import { AMapContainer } from './AMapContainer';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import type { DrivePosition } from '../../../types/drive';
+import type { ThemeType } from '../../hooks/useTheme';
 
 interface DriveRouteProps {
   positions: DrivePosition[];
   startLocation?: string;
   endLocation?: string;
+  theme?: ThemeType;
 }
 
-export function DriveRoute({ positions, startLocation, endLocation }: DriveRouteProps) {
+export function DriveRoute({ positions, startLocation, endLocation, theme = 'tesla' }: DriveRouteProps) {
   const handleMapReady = useCallback(
     (map: any, AMap: any) => {
       if (positions.length === 0) return;
@@ -18,9 +19,11 @@ export function DriveRoute({ positions, startLocation, endLocation }: DriveRoute
         (p) => new AMap.LngLat(p.longitude, p.latitude)
       );
 
+      const strokeColor = theme === 'cyberpunk' ? '#00f5ff' : theme === 'glass' ? '#3b82f6' : '#e82127';
+
       const polyline = new AMap.Polyline({
         path,
-        strokeColor: '#3b82f6',
+        strokeColor,
         strokeWeight: 4,
         strokeOpacity: 0.9,
         lineJoin: 'round',
@@ -29,50 +32,55 @@ export function DriveRoute({ positions, startLocation, endLocation }: DriveRoute
 
       map.add(polyline);
 
-      // 添加起点标记
       const startMarker = new AMap.Marker({
         position: path[0],
-        content: `<div style="background:#22c55e;color:white;padding:4px 8px;border-radius:4px;font-size:12px;">起</div>`,
-        offset: new AMap.Pixel(-15, -15),
+        content: `<div style="background:#22c55e;color:white;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:500;">起</div>`,
+        offset: new AMap.Pixel(-12, -12),
       });
       map.add(startMarker);
 
-      // 添加终点标记
       const endMarker = new AMap.Marker({
         position: path[path.length - 1],
-        content: `<div style="background:#ef4444;color:white;padding:4px 8px;border-radius:4px;font-size:12px;">终</div>`,
-        offset: new AMap.Pixel(-15, -15),
+        content: `<div style="background:#ef4444;color:white;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:500;">终</div>`,
+        offset: new AMap.Pixel(-12, -12),
       });
       map.add(endMarker);
 
-      // 自适应视野
       map.setFitView([polyline, startMarker, endMarker]);
     },
-    [positions]
+    [positions, theme]
   );
 
+  const cardClass = theme === 'cyberpunk'
+    ? 'theme-card cyber-border rounded-lg overflow-hidden'
+    : theme === 'glass'
+    ? 'theme-card glass-card rounded-xl overflow-hidden'
+    : 'theme-card rounded-lg overflow-hidden';
+
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">行程轨迹</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <AMapContainer
-          onMapReady={handleMapReady}
-          className="h-64 w-full rounded-b-lg"
-        />
-        {(startLocation || endLocation) && (
-          <div className="p-4 pt-2 text-sm">
+    <div className={cardClass}>
+      <div className="px-4 py-3 border-b border-[var(--theme-card-border)]">
+        <h3 className="text-sm font-medium theme-text">行程轨迹</h3>
+      </div>
+      <AMapContainer
+        onMapReady={handleMapReady}
+        className="h-64 w-full"
+        theme={theme}
+      />
+      {(startLocation || endLocation) && (
+        <div className="px-4 py-3 border-t border-[var(--theme-card-border)]">
+          <div className="flex flex-col gap-1.5 text-xs">
             <div className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-muted-foreground">{startLocation || '未知'}</span>
-              <span className="mx-2">→</span>
-              <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
-              <span className="text-muted-foreground">{endLocation || '未知'}</span>
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-500 text-white text-[10px]">起</span>
+              <span className="theme-text-secondary truncate">{startLocation || '未知'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[10px]">终</span>
+              <span className="theme-text-secondary truncate">{endLocation || '未知'}</span>
             </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      )}
+    </div>
   );
 }
