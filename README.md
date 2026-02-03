@@ -199,6 +199,33 @@ pnpm build
 pnpm test
 ```
 
+### Mock 数据开发
+
+截图命令支持 `--mock` 参数，使用预设的 Mock 数据进行开发，无需连接 Grafana：
+
+```bash
+# 使用 Mock 数据截图单次驾驶
+pnpm dev screenshot drive --mock
+
+# 使用 Mock 数据截图充电记录
+pnpm dev screenshot charge --mock
+
+# 使用 Mock 数据截图每日汇总
+pnpm dev screenshot daily --mock
+```
+
+Mock 数据定义在 `src/cli/commands/screenshot-mock.ts`，可自行修改测试数据。
+
+### Demo 数据
+
+Web 端在开发模式下可使用 Demo 数据，无需真实的 TeslaMate 后端。Demo 数据位于 `src/web/demo/` 目录：
+
+| 文件 | 说明 |
+|------|------|
+| `daily.ts` | 每日汇总页面的 Demo 数据（行程、充电、轨迹） |
+
+使用方式：在页面组件中导入 `demoDailyData` 等数据，配合 `NEXT_PUBLIC_DEMO_MODE=true` 环境变量切换数据源。
+
 ## License
 
 MIT
