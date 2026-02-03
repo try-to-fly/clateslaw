@@ -12,7 +12,7 @@ export class DriveService {
     const { from = 'now-90d', to = 'now', limit = 50 } = params;
 
     return this.client.query<DriveRecord>(DRIVE_QUERIES.list, {
-      variables: { car_id: carId, limit },
+      variables: { car_id: carId, limit, from, to },
       timeRange: { from, to },
     });
   }

@@ -17,6 +17,8 @@ export const CHARGE_QUERIES = {
     LEFT JOIN geofences g ON cp.geofence_id = g.id
     WHERE cp.car_id = $car_id
       AND cp.charge_energy_added > 0
+      AND cp.start_date >= '$from'::timestamptz
+      AND cp.start_date <= '$to'::timestamptz
     ORDER BY cp.start_date DESC
     LIMIT $limit
   `,

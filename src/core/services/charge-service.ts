@@ -12,7 +12,7 @@ export class ChargeService {
     const { from = 'now-90d', to = 'now', limit = 50 } = params;
 
     return this.client.query<ChargeRecord>(CHARGE_QUERIES.list, {
-      variables: { car_id: carId, limit },
+      variables: { car_id: carId, limit, from, to },
       timeRange: { from, to },
     });
   }

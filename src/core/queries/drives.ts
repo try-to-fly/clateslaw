@@ -19,6 +19,8 @@ export const DRIVE_QUERIES = {
     LEFT JOIN geofences eg ON d.end_geofence_id = eg.id
     WHERE d.car_id = $car_id
       AND d.distance > 0
+      AND d.start_date >= '$from'::timestamptz
+      AND d.start_date <= '$to'::timestamptz
     ORDER BY d.start_date DESC
     LIMIT $limit
   `,
