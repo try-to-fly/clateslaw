@@ -1,20 +1,8 @@
 import { useCallback } from 'react';
 import { AMapContainer } from './AMapContainer';
-import { getSpeedColor } from '../../lib/utils';
+import { getSpeedColorByRoute } from '../../lib/utils';
 import type { DrivePosition } from '../../../types/drive';
 import type { ThemeType } from '../../hooks/useTheme';
-
-// 每条轨迹的基础颜色（用于区分不同行程）
-const ROUTE_COLORS = [
-  '#3b82f6', // blue
-  '#8b5cf6', // violet
-  '#ec4899', // pink
-  '#f97316', // orange
-  '#14b8a6', // teal
-  '#84cc16', // lime
-  '#f43f5e', // rose
-  '#06b6d4', // cyan
-];
 
 interface DailyRouteMapProps {
   allPositions: DrivePosition[][];
@@ -34,14 +22,14 @@ export function DailyRouteMap({ allPositions, theme = 'tesla' }: DailyRouteMapPr
       validPositions.forEach((positions, routeIndex) => {
         if (positions.length < 2) return;
 
-        // 为每段轨迹创建不同颜色的 Polyline（根据速度变色）
+        // 为每段轨迹创建不同颜色的 Polyline（根据速度和轨迹索引变色）
         for (let i = 0; i < positions.length - 1; i++) {
           const p1 = positions[i];
           const p2 = positions[i + 1];
 
-          // 计算两点的平均速度
+          // 计算两点的平均速度，使用轨迹索引确定色系
           const avgSpeed = (p1.speed + p2.speed) / 2;
-          const color = getSpeedColor(avgSpeed, theme);
+          const color = getSpeedColorByRoute(avgSpeed, routeIndex, theme);
 
           const segmentPath = [
             new AMap.LngLat(p1.longitude, p1.latitude),

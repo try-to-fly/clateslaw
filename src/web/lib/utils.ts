@@ -113,3 +113,43 @@ export function getSpeedColor(speed: number, theme: 'tesla' | 'cyberpunk' | 'gla
     return colors.high;
   }
 }
+
+// 多轨迹色系定义（用于日报页面区分不同行程）
+const ROUTE_COLOR_SCHEMES = [
+  { low: '#3b82f6', mid: '#60a5fa', high: '#1d4ed8' }, // 蓝色系
+  { low: '#8b5cf6', mid: '#a78bfa', high: '#6d28d9' }, // 紫色系
+  { low: '#ec4899', mid: '#f472b6', high: '#be185d' }, // 粉色系
+  { low: '#f97316', mid: '#fb923c', high: '#c2410c' }, // 橙色系
+  { low: '#14b8a6', mid: '#2dd4bf', high: '#0f766e' }, // 青色系
+  { low: '#84cc16', mid: '#a3e635', high: '#4d7c0f' }, // 黄绿色系
+  { low: '#06b6d4', mid: '#22d3ee', high: '#0e7490' }, // 天蓝色系
+  { low: '#f43f5e', mid: '#fb7185', high: '#be123c' }, // 玫红色系
+];
+
+/**
+ * 根据速度和轨迹索引返回对应颜色
+ * 每条轨迹使用不同色系，轨迹内部根据速度深浅变化
+ * low = 低速 (< 30 km/h) - 中等亮度
+ * mid = 中速 (30-80 km/h) - 最亮
+ * high = 高速 (> 80 km/h) - 最深
+ */
+export function getSpeedColorByRoute(
+  speed: number,
+  routeIndex: number,
+  theme: 'tesla' | 'cyberpunk' | 'glass' = 'tesla'
+): string {
+  const scheme = ROUTE_COLOR_SCHEMES[routeIndex % ROUTE_COLOR_SCHEMES.length];
+
+  if (speed < 30) {
+    // 0-30: low 到 mid 过渡
+    const factor = speed / 30;
+    return interpolateColor(scheme.low, scheme.mid, factor);
+  } else if (speed < 80) {
+    // 30-80: mid 到 high 过渡
+    const factor = (speed - 30) / 50;
+    return interpolateColor(scheme.mid, scheme.high, factor);
+  } else {
+    // 80+: 最深色
+    return scheme.high;
+  }
+}
