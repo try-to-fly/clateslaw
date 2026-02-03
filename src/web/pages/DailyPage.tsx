@@ -2,6 +2,7 @@ import { useData, type DailyData } from '../hooks/useData';
 import { useTheme } from '../hooks/useTheme';
 import { StatsCard } from '../components/cards/StatsCard';
 import { EnergyBar } from '../components/charts/EnergyBar';
+import { DailyRouteMap } from '../components/maps/DailyRouteMap';
 import {
   formatDistance,
   formatDuration,
@@ -21,7 +22,7 @@ export default function DailyPage() {
     );
   }
 
-  const { date, drives, charges, stats } = data;
+  const { date, drives, charges, allPositions, stats } = data;
 
   const cardClass = theme === 'cyberpunk'
     ? 'theme-card cyber-border rounded-lg overflow-hidden'
@@ -60,6 +61,10 @@ export default function DailyPage() {
           { label: '充入电量', value: formatEnergy(stats.totalEnergyAdded) },
         ]}
       />
+
+      {allPositions && allPositions.length > 0 && (
+        <DailyRouteMap allPositions={allPositions} theme={theme} />
+      )}
 
       {drives.length > 0 && (
         <div className={cardClass}>

@@ -32,7 +32,9 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
   background: var(--theme-bg);
   color: var(--theme-text);
   -webkit-font-smoothing: antialiased;
@@ -41,7 +43,5 @@ body {
 
 /* 截图模式下的固定宽度容器 */
 .screenshot-container {
-  width: var(--screenshot-width, 402px);
   min-width: var(--screenshot-width, 402px);
-  max-width: var(--screenshot-width, 402px);
 }

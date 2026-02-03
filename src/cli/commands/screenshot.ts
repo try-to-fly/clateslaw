@@ -10,6 +10,7 @@ import { getGrafanaClient, DriveService, ChargeService } from '../../core/index.
 import { config } from '../../config/index.js';
 import type { DriveRecord, DrivePosition } from '../../types/drive.js';
 import type { ChargeRecord, ChargeCurvePoint } from '../../types/charge.js';
+import { getMockDriveData, getMockChargeData, getMockDailyData } from './screenshot-mock.js';
 
 function findChromePath(): string | undefined {
   const paths = [
@@ -35,6 +36,7 @@ interface DailyData {
   date: string;
   drives: DriveRecord[];
   charges: ChargeRecord[];
+  allPositions: DrivePosition[][];
   stats: {
     totalDistance: number;
     totalDuration: number;
@@ -88,6 +90,7 @@ interface ScreenshotOptions {
   target?: string;
   message?: string;
   theme?: string;
+  mock?: boolean;
 }
 
 async function startServer(distPath: string): Promise<http.Server> {
@@ -271,6 +274,11 @@ async function getDailyData(carId: number, dateStr: string): Promise<DailyData> 
     chargeService.getCharges(carId, { from, to, limit: 50 }),
   ]);
 
+  // 并行获取所有行程的轨迹数据
+  const allPositions = await Promise.all(
+    drives.map((drive) => driveService.getDrivePositions(carId, drive.id))
+  );
+
   const stats = {
     totalDistance: drives.reduce((sum, d) => sum + d.distance, 0),
     totalDuration: drives.reduce((sum, d) => sum + d.duration_min, 0),
@@ -278,31 +286,39 @@ async function getDailyData(carId: number, dateStr: string): Promise<DailyData> 
     totalEnergyAdded: charges.reduce((sum, c) => sum + c.charge_energy_added, 0),
   };
 
-  return { date: dateStr, drives, charges, stats };
+  return { date: dateStr, drives, charges, allPositions, stats };
 }
 
 async function screenshotDrive(
   id: string | undefined,
   options: ScreenshotOptions
 ): Promise<void> {
-  const carId = parseInt(options.carId || '1', 10);
   const width = parseInt(options.width || String(DEFAULT_WIDTH), 10);
   const scale = parseInt(options.scale || String(DEFAULT_SCALE), 10);
 
+  let data: DriveData;
   let driveId: number;
-  if (id) {
-    driveId = parseInt(id, 10);
+
+  if (options.mock) {
+    console.log('使用 Mock 数据...');
+    data = getMockDriveData();
+    driveId = data.drive.id;
   } else {
-    const client = getGrafanaClient();
-    const driveService = new DriveService(client);
-    const drives = await driveService.getDrives(carId, { limit: 1 });
-    if (drives.length === 0) {
-      throw new Error('No drives found');
+    const carId = parseInt(options.carId || '1', 10);
+    if (id) {
+      driveId = parseInt(id, 10);
+    } else {
+      const client = getGrafanaClient();
+      const driveService = new DriveService(client);
+      const drives = await driveService.getDrives(carId, { limit: 1 });
+      if (drives.length === 0) {
+        throw new Error('No drives found');
+      }
+      driveId = drives[0].id;
     }
-    driveId = drives[0].id;
+    data = await getDriveData(carId, driveId);
   }
 
-  const data = await getDriveData(carId, driveId);
   const outputPath = options.output || `drive-${driveId}.png`;
 
   const distPath = await ensureWebBuild();
@@ -329,24 +345,32 @@ async function screenshotCharge(
   id: string | undefined,
   options: ScreenshotOptions
 ): Promise<void> {
-  const carId = parseInt(options.carId || '1', 10);
   const width = parseInt(options.width || String(DEFAULT_WIDTH), 10);
   const scale = parseInt(options.scale || String(DEFAULT_SCALE), 10);
 
+  let data: ChargeData;
   let chargeId: number;
-  if (id) {
-    chargeId = parseInt(id, 10);
+
+  if (options.mock) {
+    console.log('使用 Mock 数据...');
+    data = getMockChargeData();
+    chargeId = data.charge.id;
   } else {
-    const client = getGrafanaClient();
-    const chargeService = new ChargeService(client);
-    const charges = await chargeService.getCharges(carId, { limit: 1 });
-    if (charges.length === 0) {
-      throw new Error('No charges found');
+    const carId = parseInt(options.carId || '1', 10);
+    if (id) {
+      chargeId = parseInt(id, 10);
+    } else {
+      const client = getGrafanaClient();
+      const chargeService = new ChargeService(client);
+      const charges = await chargeService.getCharges(carId, { limit: 1 });
+      if (charges.length === 0) {
+        throw new Error('No charges found');
+      }
+      chargeId = charges[0].id;
     }
-    chargeId = charges[0].id;
+    data = await getChargeData(carId, chargeId);
   }
 
-  const data = await getChargeData(carId, chargeId);
   const outputPath = options.output || `charge-${chargeId}.png`;
 
   const distPath = await ensureWebBuild();
@@ -373,12 +397,22 @@ async function screenshotDaily(
   dateStr: string | undefined,
   options: ScreenshotOptions
 ): Promise<void> {
-  const carId = parseInt(options.carId || '1', 10);
   const width = parseInt(options.width || String(DEFAULT_WIDTH), 10);
   const scale = parseInt(options.scale || String(DEFAULT_SCALE), 10);
 
-  const date = dateStr || new Date().toISOString().split('T')[0];
-  const data = await getDailyData(carId, date);
+  let data: DailyData;
+  let date: string;
+
+  if (options.mock) {
+    console.log('使用 Mock 数据...');
+    data = getMockDailyData();
+    date = data.date;
+  } else {
+    const carId = parseInt(options.carId || '1', 10);
+    date = dateStr || new Date().toISOString().split('T')[0];
+    data = await getDailyData(carId, date);
+  }
+
   const outputPath = options.output || `daily-${date}.png`;
 
   const distPath = await ensureWebBuild();
@@ -415,6 +449,7 @@ export const screenshotCommand = new Command('screenshot')
       .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
       .option('-m, --message <text>', '自定义消息')
       .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
+      .option('--mock', '使用 Mock 数据（无需连接 Grafana）')
       .action(screenshotDrive)
   )
   .addCommand(
@@ -429,6 +464,7 @@ export const screenshotCommand = new Command('screenshot')
       .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
       .option('-m, --message <text>', '自定义消息')
       .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
+      .option('--mock', '使用 Mock 数据（无需连接 Grafana）')
       .action(screenshotCharge)
   )
   .addCommand(
@@ -443,5 +479,6 @@ export const screenshotCommand = new Command('screenshot')
       .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
       .option('-m, --message <text>', '自定义消息')
       .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
+      .option('--mock', '使用 Mock 数据（无需连接 Grafana）')
       .action(screenshotDaily)
   );

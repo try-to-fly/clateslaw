@@ -28,6 +28,7 @@ export interface DailyData {
   date: string;
   drives: DriveRecord[];
   charges: ChargeRecord[];
+  allPositions: DrivePosition[][];
   stats: {
     totalDistance: number;
     totalDuration: number;
