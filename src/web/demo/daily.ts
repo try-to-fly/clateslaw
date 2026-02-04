@@ -12,6 +12,13 @@ export interface DemoDailyData {
     totalEnergyUsed: number;
     totalEnergyAdded: number;
   };
+  tpms?: {
+    fl: number | null;
+    fr: number | null;
+    rl: number | null;
+    rr: number | null;
+    outside_temp?: number | null;
+  };
 }
 
 function generateDemoDrives(): DriveRecord[] {
@@ -168,5 +175,12 @@ export const demoDailyData: DemoDailyData = {
     totalDuration: demoDrives.reduce((sum, d) => sum + d.duration_min, 0),
     totalEnergyUsed: 33,
     totalEnergyAdded: 31.72,
+  },
+  tpms: {
+    fl: 3.0,
+    fr: 3.0,
+    rl: 3.0,
+    rr: 3.1,
+    outside_temp: 10,
   },
 };

@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 
 const DATA_DIR = join(process.cwd(), 'data');
@@ -30,4 +30,14 @@ export function loadCarData<T>(carId: number, subPath: string): T | null {
 
 export function loadCarDataOrThrow<T>(carId: number, subPath: string): T {
   return loadJsonOrThrow<T>(getCarDataPath(carId, subPath));
+}
+
+export function listCarDataFiles(carId: number, subPath: string): string[] {
+  const fullPath = join(DATA_DIR, getCarDataPath(carId, subPath));
+  if (!existsSync(fullPath)) {
+    return [];
+  }
+  return readdirSync(fullPath)
+    .filter((file) => file.endsWith('.json'))
+    .sort();
 }

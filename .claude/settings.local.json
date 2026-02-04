@@ -20,7 +20,8 @@
       "WebFetch(domain:lbs.amap.com)",
       "Bash(pnpm test:*)",
       "Bash(node:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(xargs:*)"
     ]
   }
 }

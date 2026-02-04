@@ -2,6 +2,7 @@ import { useData, type DailyData } from '../hooks/useData';
 import { useTheme } from '../hooks/useTheme';
 import { getCardClass, getAccentColor } from '../hooks/useStyles';
 import { DailyRouteMap } from '../components/maps/DailyRouteMap';
+import { TpmsCard } from '../components/cards/TpmsCard';
 import {
   formatDuration,
   formatEnergy,
@@ -106,6 +107,9 @@ export default function DailyPage() {
           </div>
         </div>
       )}
+
+      {/* 胎压数据 */}
+      {data.tpms && <TpmsCard data={data.tpms} theme={theme} />}
     </div>
   );
 }

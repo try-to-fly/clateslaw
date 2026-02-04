@@ -48,3 +48,32 @@ export function countNullValues<T extends object>(
 ): number {
   return items.filter((item) => item[field] === null).length;
 }
+
+export function isValidLatitude(value: unknown): boolean {
+  return typeof value === 'number' && value >= -90 && value <= 90;
+}
+
+export function isValidLongitude(value: unknown): boolean {
+  return typeof value === 'number' && value >= -180 && value <= 180;
+}
+
+export function isValidTirePressure(value: unknown): boolean {
+  return typeof value === 'number' && value >= 1.5 && value <= 4.0;
+}
+
+export function isValidTemperature(value: unknown): boolean {
+  return typeof value === 'number' && value >= -40 && value <= 60;
+}
+
+export function isSortedAscending<T>(items: T[], field: keyof T): boolean {
+  for (let i = 1; i < items.length; i++) {
+    if (items[i][field] < items[i - 1][field]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function isNonDecreasing<T>(items: T[], field: keyof T): boolean {
+  return isSortedAscending(items, field);
+}

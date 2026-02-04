@@ -35,6 +35,13 @@ export interface DailyData {
     totalEnergyUsed: number;
     totalEnergyAdded: number;
   };
+  tpms?: {
+    fl: number | null;
+    fr: number | null;
+    rl: number | null;
+    rr: number | null;
+    outside_temp?: number | null;
+  };
 }
 
 export interface WeeklyData {

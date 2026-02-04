@@ -5,7 +5,7 @@ import * as http from 'node:http';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import handler from 'serve-handler';
-import { getGrafanaClient, DriveService, ChargeService, StatsService } from '../../core/index.js';
+import { getGrafanaClient, DriveService, ChargeService, StatsService, TPMSService } from '../../core/index.js';
 import { getWeekRange, getMonthRange } from '../../core/utils/time.js';
 import { browserPool } from '../../core/utils/browser-pool.js';
 import { SCREENSHOT } from '../../constants.js';
@@ -36,6 +36,13 @@ interface DailyData {
     totalDuration: number;
     totalEnergyUsed: number;
     totalEnergyAdded: number;
+  };
+  tpms?: {
+    fl: number | null;
+    fr: number | null;
+    rl: number | null;
+    rr: number | null;
+    outside_temp?: number | null;
   };
 }
 
@@ -333,6 +340,7 @@ async function getDailyData(carId: number, dateStr: string): Promise<DailyData> 
   const client = getGrafanaClient();
   const driveService = new DriveService(client);
   const chargeService = new ChargeService(client);
+  const tpmsService = new TPMSService(client);
 
   const date = new Date(dateStr);
   const startOfDay = new Date(date);
@@ -343,9 +351,10 @@ async function getDailyData(carId: number, dateStr: string): Promise<DailyData> 
   const from = startOfDay.toISOString();
   const to = endOfDay.toISOString();
 
-  const [drives, charges] = await Promise.all([
+  const [drives, charges, tpmsStats] = await Promise.all([
     driveService.getDrives(carId, { from, to, limit: 50 }),
     chargeService.getCharges(carId, { from, to, limit: 50 }),
+    tpmsService.getStats(carId, { from, to }),
   ]);
 
   // 并行获取所有行程的轨迹数据
@@ -360,7 +369,18 @@ async function getDailyData(carId: number, dateStr: string): Promise<DailyData> 
     totalEnergyAdded: charges.reduce((sum, c) => sum + c.charge_energy_added, 0),
   };
 
-  return { date: dateStr, drives, charges, allPositions, stats };
+  // 构建 TPMS 数据
+  const tpms = tpmsStats.latest
+    ? {
+        fl: tpmsStats.latest.fl,
+        fr: tpmsStats.latest.fr,
+        rl: tpmsStats.latest.rl,
+        rr: tpmsStats.latest.rr,
+        outside_temp: tpmsStats.latest.outside_temp,
+      }
+    : undefined;
+
+  return { date: dateStr, drives, charges, allPositions, stats, tpms };
 }
 
 async function getWeeklyData(carId: number, dateStr?: string): Promise<WeeklyData> {
