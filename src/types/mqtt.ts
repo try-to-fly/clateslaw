@@ -28,4 +28,25 @@ export interface StateTracker {
   lastChargeTrigger: number;
   lastOfflineRange: RangeSnapshot | null;
   lastOnlineTrigger: number;
+  // 新增字段
+  sleepStartTime: number | null;
+  updateAvailable: boolean;
+  updateVersion: string | null;
+  lastUpdateNotifyTime: number;
 }
+
+export interface PersistedMqttState {
+  vehicleState: VehicleState | null;
+  chargingState: ChargingState | null;
+  lastDriveTrigger: number;
+  lastChargeTrigger: number;
+  lastOfflineRange: RangeSnapshot | null;
+  lastOnlineTrigger: number;
+  sleepStartTime: number | null;
+  updateAvailable: boolean;
+  updateVersion: string | null;
+  lastUpdateNotifyTime: number;
+  lastUpdated: number;
+}
+
+export const SLEEP_STATES: VehicleState[] = ['asleep', 'offline', 'suspended'];

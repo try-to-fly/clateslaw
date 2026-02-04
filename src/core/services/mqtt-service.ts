@@ -1,7 +1,10 @@
 import mqtt from 'mqtt';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { VehicleState, ChargingState, StateTracker, RangeSnapshot } from '../../types/mqtt.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import type { VehicleState, ChargingState, StateTracker, RangeSnapshot, PersistedMqttState } from '../../types/mqtt.js';
+import { SLEEP_STATES } from '../../types/mqtt.js';
 import { getMessageService } from './message-service.js';
 import { getGrafanaClient } from '../index.js';
 import { ProjectedRangeService } from './projected-range-service.js';
@@ -11,6 +14,8 @@ const execAsync = promisify(exec);
 const DEBOUNCE_MS = 60 * 1000; // 60 秒防抖
 const TRIGGER_DELAY_MS = 30 * 1000; // 30 秒延迟等待数据入库
 const ONLINE_NOTIFY_DELAY_MS = 5 * 1000; // 5 秒延迟发送上线通知
+const PERSIST_DEBOUNCE_MS = 5 * 1000; // 5 秒防抖持久化
+const UPDATE_NOTIFY_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 小时更新通知间隔
 
 export interface MqttServiceOptions {
   host: string;
@@ -29,7 +34,12 @@ export class MqttService {
     lastChargeTrigger: 0,
     lastOfflineRange: null,
     lastOnlineTrigger: 0,
+    sleepStartTime: null,
+    updateAvailable: false,
+    updateVersion: null,
+    lastUpdateNotifyTime: 0,
   };
+  private persistTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: MqttServiceOptions) {
     this.options = options;
@@ -38,6 +48,9 @@ export class MqttService {
   async start(): Promise<void> {
     const { host, port, carId, topicPrefix } = this.options;
     const brokerUrl = `mqtt://${host}:${port}`;
+
+    // 加载持久化状态
+    await this.loadPersistedState();
 
     console.log(`正在连接 MQTT Broker: ${brokerUrl}`);
 
@@ -96,6 +109,8 @@ export class MqttService {
     const topics = [
       `${topicPrefix}/cars/${carId}/state`,
       `${topicPrefix}/cars/${carId}/charging_state`,
+      `${topicPrefix}/cars/${carId}/update_available`,
+      `${topicPrefix}/cars/${carId}/update_version`,
     ];
 
     topics.forEach((topic) => {
@@ -113,11 +128,17 @@ export class MqttService {
     const { carId, topicPrefix } = this.options;
     const stateTopic = `${topicPrefix}/cars/${carId}/state`;
     const chargingTopic = `${topicPrefix}/cars/${carId}/charging_state`;
+    const updateAvailableTopic = `${topicPrefix}/cars/${carId}/update_available`;
+    const updateVersionTopic = `${topicPrefix}/cars/${carId}/update_version`;
 
     if (topic === stateTopic) {
       this.handleVehicleStateChange(message as VehicleState);
     } else if (topic === chargingTopic) {
       this.handleChargingStateChange(message as ChargingState);
+    } else if (topic === updateAvailableTopic) {
+      this.handleUpdateAvailable(message === 'true');
+    } else if (topic === updateVersionTopic) {
+      this.handleUpdateVersion(message);
     }
   }
 
@@ -127,13 +148,22 @@ export class MqttService {
 
     console.log(`车辆状态: ${prevState || '(初始化)'} -> ${newState}`);
 
+    const wasSleeping = prevState && SLEEP_STATES.includes(prevState);
+    const isSleeping = SLEEP_STATES.includes(newState);
+
+    // 进入休眠状态时记录时间
+    if (!wasSleeping && isSleeping) {
+      this.state.sleepStartTime = Date.now();
+      console.log('车辆进入休眠状态');
+    }
+
     // 进入 offline 时记录当前续航
     if (newState === 'offline' && prevState !== 'offline') {
       this.captureOfflineRange();
     }
 
-    // offline -> online 时发送上线通知
-    if (prevState === 'offline' && newState !== 'offline') {
+    // 从休眠状态唤醒时发送上线通知
+    if (wasSleeping && !isSleeping) {
       this.triggerOnlineNotification();
     }
 
@@ -141,6 +171,8 @@ export class MqttService {
     if (prevState === 'driving' && newState !== 'driving') {
       this.triggerDriveScreenshot();
     }
+
+    this.schedulePersist();
   }
 
   private handleChargingStateChange(newState: ChargingState): void {
@@ -153,6 +185,8 @@ export class MqttService {
     if (prevState === 'Charging' && (newState === 'Complete' || newState === 'Disconnected')) {
       this.triggerChargeScreenshot();
     }
+
+    this.schedulePersist();
   }
 
   private triggerDriveScreenshot(): void {
@@ -249,6 +283,13 @@ export class MqttService {
 
       let message = `🚗 车辆已上线\n当前续航: ${currentRange} km (${currentLevel}%)`;
 
+      // 添加休眠时长
+      if (this.state.sleepStartTime) {
+        const sleepDuration = Date.now() - this.state.sleepStartTime;
+        message += `\n休眠时长: ${this.formatDuration(sleepDuration)}`;
+        this.state.sleepStartTime = null;
+      }
+
       // 如果有 offline 时的记录，计算损耗
       if (this.state.lastOfflineRange) {
         const rangeLoss = this.state.lastOfflineRange.range_km - currentRange;
@@ -265,5 +306,160 @@ export class MqttService {
     } catch (error) {
       console.error('发送上线通知失败:', error instanceof Error ? error.message : error);
     }
+  }
+
+  /**
+   * 处理更新可用状态
+   */
+  private handleUpdateAvailable(available: boolean): void {
+    const prevAvailable = this.state.updateAvailable;
+    this.state.updateAvailable = available;
+
+    console.log(`更新可用状态: ${prevAvailable} -> ${available}`);
+
+    if (available && this.state.updateVersion) {
+      this.checkAndSendUpdateNotification();
+    }
+
+    this.schedulePersist();
+  }
+
+  /**
+   * 处理更新版本
+   */
+  private handleUpdateVersion(version: string): void {
+    const prevVersion = this.state.updateVersion;
+    this.state.updateVersion = version;
+
+    console.log(`更新版本: ${prevVersion || '(无)'} -> ${version}`);
+
+    if (this.state.updateAvailable && version) {
+      this.checkAndSendUpdateNotification();
+    }
+
+    this.schedulePersist();
+  }
+
+  /**
+   * 检查并发送更新通知（4小时间隔）
+   */
+  private async checkAndSendUpdateNotification(): Promise<void> {
+    const now = Date.now();
+    if (now - this.state.lastUpdateNotifyTime < UPDATE_NOTIFY_INTERVAL_MS) {
+      console.log('更新通知在 4 小时间隔内，跳过');
+      return;
+    }
+
+    try {
+      const message = `🔄 软件更新可用\n新版本: ${this.state.updateVersion}`;
+      const messageService = getMessageService();
+      await messageService.sendText(message);
+      this.state.lastUpdateNotifyTime = now;
+      this.schedulePersist();
+      console.log('更新通知已发送');
+    } catch (error) {
+      console.error('发送更新通知失败:', error instanceof Error ? error.message : error);
+    }
+  }
+
+  /**
+   * 格式化时长
+   */
+  private formatDuration(ms: number): string {
+    const totalMinutes = Math.floor(ms / (60 * 1000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours > 0) {
+      return `${hours}小时${minutes}分钟`;
+    }
+    return `${minutes}分钟`;
+  }
+
+  /**
+   * 获取持久化文件路径
+   */
+  private getStatePath(): string {
+    return path.join(process.cwd(), 'data', 'cars', `car-${this.options.carId}`, 'mqtt-state.json');
+  }
+
+  /**
+   * 加载持久化状态
+   */
+  private async loadPersistedState(): Promise<void> {
+    const statePath = this.getStatePath();
+    try {
+      const content = await fs.readFile(statePath, 'utf-8');
+      const persisted: PersistedMqttState = JSON.parse(content);
+
+      this.state.vehicleState = persisted.vehicleState;
+      this.state.chargingState = persisted.chargingState;
+      this.state.lastDriveTrigger = persisted.lastDriveTrigger;
+      this.state.lastChargeTrigger = persisted.lastChargeTrigger;
+      this.state.lastOfflineRange = persisted.lastOfflineRange;
+      this.state.lastOnlineTrigger = persisted.lastOnlineTrigger;
+      this.state.sleepStartTime = persisted.sleepStartTime;
+      this.state.updateAvailable = persisted.updateAvailable;
+      this.state.updateVersion = persisted.updateVersion;
+      this.state.lastUpdateNotifyTime = persisted.lastUpdateNotifyTime;
+
+      console.log(`已加载持久化状态: ${statePath}`);
+      console.log(`  车辆状态: ${this.state.vehicleState || '(无)'}`);
+      console.log(`  充电状态: ${this.state.chargingState || '(无)'}`);
+      if (this.state.sleepStartTime) {
+        console.log(`  休眠开始: ${new Date(this.state.sleepStartTime).toLocaleString()}`);
+      }
+      if (this.state.updateAvailable) {
+        console.log(`  待更新版本: ${this.state.updateVersion}`);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        console.log('无持久化状态文件，使用默认状态');
+      } else {
+        console.error('加载持久化状态失败:', error instanceof Error ? error.message : error);
+      }
+    }
+  }
+
+  /**
+   * 保存状态到文件
+   */
+  private async persistState(): Promise<void> {
+    const statePath = this.getStatePath();
+    const persisted: PersistedMqttState = {
+      vehicleState: this.state.vehicleState,
+      chargingState: this.state.chargingState,
+      lastDriveTrigger: this.state.lastDriveTrigger,
+      lastChargeTrigger: this.state.lastChargeTrigger,
+      lastOfflineRange: this.state.lastOfflineRange,
+      lastOnlineTrigger: this.state.lastOnlineTrigger,
+      sleepStartTime: this.state.sleepStartTime,
+      updateAvailable: this.state.updateAvailable,
+      updateVersion: this.state.updateVersion,
+      lastUpdateNotifyTime: this.state.lastUpdateNotifyTime,
+      lastUpdated: Date.now(),
+    };
+
+    try {
+      const dir = path.dirname(statePath);
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(statePath, JSON.stringify(persisted, null, 2));
+      console.log('状态已持久化');
+    } catch (error) {
+      console.error('持久化状态失败:', error instanceof Error ? error.message : error);
+    }
+  }
+
+  /**
+   * 防抖持久化（5秒）
+   */
+  private schedulePersist(): void {
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer);
+    }
+    this.persistTimer = setTimeout(() => {
+      this.persistState();
+      this.persistTimer = null;
+    }, PERSIST_DEBOUNCE_MS);
   }
 }
