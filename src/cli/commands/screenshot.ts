@@ -11,6 +11,8 @@ import { config } from '../../config/index.js';
 import type { DriveRecord, DrivePosition } from '../../types/drive.js';
 import type { ChargeRecord, ChargeCurvePoint } from '../../types/charge.js';
 import { getMockDriveData, getMockChargeData, getMockDailyData } from './screenshot-mock.js';
+import { executeQuery } from '../../core/query-executor.js';
+import type { TeslaQuery } from '../../types/query-protocol.js';
 
 function findChromePath(): string | undefined {
   const paths = [
@@ -440,6 +442,223 @@ async function screenshotDaily(
   }
 }
 
+/**
+ * 解析查询输入（支持 JSON 字符串或文件路径）
+ */
+function parseQueryInput(input: string): TeslaQuery {
+  const trimmed = input.trim();
+
+  if (fs.existsSync(trimmed)) {
+    const content = fs.readFileSync(trimmed, 'utf-8');
+    return JSON.parse(content);
+  }
+
+  return JSON.parse(trimmed);
+}
+
+/**
+ * 验证查询协议
+ */
+function validateQuery(query: unknown): query is TeslaQuery {
+  if (!query || typeof query !== 'object') return false;
+  const q = query as Record<string, unknown>;
+  if (q.version !== '1.0') return false;
+  if (typeof q.type !== 'string') return false;
+  return true;
+}
+
+type PageType = 'drive' | 'charge' | 'daily';
+
+/**
+ * 根据查询类型确定页面类型
+ */
+function determinePageType(query: TeslaQuery): PageType {
+  // 如果有 screenshot 配置，使用其 type
+  if (query.screenshot?.type) {
+    return query.screenshot.type;
+  }
+
+  // 根据 query.type 推断
+  switch (query.type) {
+    case 'detail.drive':
+    case 'drives':
+      return 'drive';
+    case 'detail.charge':
+    case 'charges':
+      return 'charge';
+    case 'screenshot':
+      return query.screenshot?.type || 'daily';
+    default:
+      return 'daily';
+  }
+}
+
+/**
+ * 为截图获取数据
+ */
+async function fetchDataForScreenshot(
+  query: TeslaQuery,
+  pageType: PageType,
+  carId: number
+): Promise<DriveData | ChargeData | DailyData> {
+  switch (pageType) {
+    case 'drive': {
+      // 如果有明确的 recordId
+      if (query.recordId) {
+        return getDriveData(carId, query.recordId);
+      }
+      // 如果有 screenshot.id
+      if (query.screenshot?.id) {
+        return getDriveData(carId, query.screenshot.id);
+      }
+      // 否则查询最近的行程
+      const result = await executeQuery({
+        ...query,
+        type: 'drives',
+        pagination: { limit: 1 },
+      });
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to fetch drives');
+      }
+      const drives = result.data as DriveRecord[];
+      if (drives.length === 0) {
+        throw new Error('No drives found');
+      }
+      return getDriveData(carId, drives[0].id);
+    }
+
+    case 'charge': {
+      // 如果有明确的 recordId
+      if (query.recordId) {
+        return getChargeData(carId, query.recordId);
+      }
+      // 如果有 screenshot.id
+      if (query.screenshot?.id) {
+        return getChargeData(carId, query.screenshot.id);
+      }
+      // 否则查询最近的充电
+      const result = await executeQuery({
+        ...query,
+        type: 'charges',
+        pagination: { limit: 1 },
+      });
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to fetch charges');
+      }
+      const charges = result.data as ChargeRecord[];
+      if (charges.length === 0) {
+        throw new Error('No charges found');
+      }
+      return getChargeData(carId, charges[0].id);
+    }
+
+    case 'daily': {
+      const date = query.screenshot?.date || new Date().toISOString().split('T')[0];
+      return getDailyData(carId, date);
+    }
+  }
+}
+
+/**
+ * 生成输出文件路径
+ */
+function generateOutputPath(
+  query: TeslaQuery,
+  pageType: PageType,
+  data: DriveData | ChargeData | DailyData
+): string {
+  const timestamp = Date.now();
+  switch (pageType) {
+    case 'drive':
+      return `drive-${(data as DriveData).drive.id}-${timestamp}.png`;
+    case 'charge':
+      return `charge-${(data as ChargeData).charge.id}-${timestamp}.png`;
+    case 'daily':
+      return `daily-${(data as DailyData).date}-${timestamp}.png`;
+  }
+}
+
+/**
+ * 生成消息
+ */
+function generateMessage(
+  query: TeslaQuery,
+  pageType: PageType,
+  data: DriveData | ChargeData | DailyData
+): string {
+  switch (pageType) {
+    case 'drive':
+      return `行程 #${(data as DriveData).drive.id} 截图`;
+    case 'charge':
+      return `充电 #${(data as ChargeData).charge.id} 截图`;
+    case 'daily':
+      return `${(data as DailyData).date} 日报截图`;
+  }
+}
+
+/**
+ * 从 TeslaQuery JSON 生成截图
+ */
+async function screenshotQuery(
+  jsonInput: string,
+  options: ScreenshotOptions
+): Promise<void> {
+  // 1. 解析查询
+  let query: TeslaQuery;
+  try {
+    query = parseQueryInput(jsonInput);
+  } catch (error) {
+    console.error('Error: 无效的 JSON 输入');
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+
+  // 2. 验证查询
+  if (!validateQuery(query)) {
+    console.error('Error: 无效的查询协议');
+    console.error('查询必须包含 version: "1.0" 和有效的 type');
+    process.exit(1);
+  }
+
+  const width = parseInt(options.width || String(DEFAULT_WIDTH), 10);
+  const scale = parseInt(options.scale || String(DEFAULT_SCALE), 10);
+  const carId = parseInt(options.carId || String(query.carId || 1), 10);
+
+  // 3. 确定页面类型
+  const pageType = determinePageType(query);
+  console.log(`页面类型: ${pageType}`);
+
+  // 4. 获取数据
+  console.log('正在获取数据...');
+  const data = await fetchDataForScreenshot(query, pageType, carId);
+
+  // 5. 生成输出路径
+  const outputPath = options.output || generateOutputPath(query, pageType, data);
+
+  // 6. 构建并启动服务器
+  const distPath = await ensureWebBuild();
+  const server = await startServer(distPath);
+  const port = getServerPort(server);
+
+  try {
+    // 7. 生成截图
+    const theme = options.theme || 'tesla';
+    await takeScreenshot(
+      `http://localhost:${port}/${pageType}?theme=${theme}`,
+      data,
+      outputPath,
+      width,
+      scale
+    );
+
+    // 8. 发送到 Telegram（如果需要）
+    const message = options.message || generateMessage(query, pageType, data);
+    await sendAndCleanup(outputPath, options, message);
+  } finally {
+    server.close();
+  }
+}
+
 export const screenshotCommand = new Command('screenshot')
   .description('Generate screenshot of Tesla data visualization')
   .addCommand(
@@ -486,4 +705,18 @@ export const screenshotCommand = new Command('screenshot')
       .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
       .option('--mock', '使用 Mock 数据（无需连接 Grafana）')
       .action(screenshotDaily)
+  )
+  .addCommand(
+    new Command('query')
+      .description('Screenshot from TeslaQuery JSON')
+      .argument('<json>', 'TeslaQuery JSON string or file path')
+      .option('-o, --output <path>', 'Output file path')
+      .option('-w, --width <number>', 'Viewport width', String(DEFAULT_WIDTH))
+      .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
+      .option('-c, --car-id <number>', 'Car ID')
+      .option('-s, --send', '发送到 Telegram 后删除文件')
+      .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
+      .option('-m, --message <text>', '自定义消息')
+      .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
+      .action(screenshotQuery)
   );

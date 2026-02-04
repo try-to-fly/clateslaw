@@ -1,6 +1,24 @@
-# Tesla Service
+# Tesla Service (Clateslaw)
 
-基于 TeslaMate 的 Tesla 数据服务 CLI 工具，用于查询和分析 Tesla 车辆数据。
+基于 TeslaMate 的 Tesla 数据服务 CLI 工具，为 [OpenClaw](https://github.com/anthropics/openclaw) 提供 Tesla 车辆数据查询能力。
+
+## 核心用途
+
+本项目主要作为 OpenClaw 的 Skill 使用，通过自然语言与 AI 交互查询 Tesla 车辆数据：
+
+```
+用户: "给我看看最近的行程"
+  ↓
+AI (OpenClaw Skill) 解析自然语言
+  ↓
+生成 TeslaQuery JSON
+  ↓
+执行 tesla screenshot query '<json>' --send
+  ↓
+截图发送到 Telegram
+```
+
+**Skill 文档**: [`skills/tesla/SKILL.md`](./skills/tesla/SKILL.md)
 
 ## 功能特性
 
@@ -99,6 +117,11 @@ tesla <command>
 | `stats charging <car-id>` | 充电统计 |
 | `stats driving <car-id>` | 驾驶统计 |
 | `stats period <car-id>` | 周期统计 |
+| `query <json>` | 执行 TeslaQuery 协议查询 |
+| `screenshot query <json>` | 从 TeslaQuery 生成截图 |
+| `screenshot drive [id]` | 行程截图 |
+| `screenshot charge [id]` | 充电截图 |
+| `screenshot daily [date]` | 日报截图 |
 
 ### 通用选项
 
@@ -122,6 +145,29 @@ pnpm dev charges 1 -f now-30d -o json
 # 查看驾驶统计
 pnpm dev stats driving 1
 ```
+
+### TeslaQuery 协议
+
+支持通过 JSON 协议执行结构化查询，主要用于 AI/Skill 集成：
+
+```bash
+# 查询最近的行程并截图发送
+tesla screenshot query '{"version":"1.0","type":"drives","pagination":{"limit":1}}' --send
+
+# 查询指定行程详情
+tesla screenshot query '{"version":"1.0","type":"detail.drive","recordId":4275}' --send
+
+# 生成今日日报
+tesla screenshot query '{"version":"1.0","type":"screenshot","screenshot":{"type":"daily"}}' --send
+
+# 纯数据查询（不截图）
+tesla query '{"version":"1.0","type":"stats.driving","timeRange":{"semantic":"this_week"}}'
+
+# 从文件读取查询
+tesla screenshot query ./query.json --send
+```
+
+详细协议定义见 [`skills/tesla/references/query-protocol.md`](./skills/tesla/references/query-protocol.md)
 
 ## 数据采集
 
