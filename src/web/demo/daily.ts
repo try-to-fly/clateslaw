@@ -59,6 +59,8 @@ function generateDemoDrives(): DriveRecord[] {
       outside_temp_avg: temps[i],
       start_location: locationPair.start,
       end_location: locationPair.end,
+      ascent: Math.round(20 + Math.random() * 60),
+      descent: Math.round(15 + Math.random() * 50),
     });
   }
 

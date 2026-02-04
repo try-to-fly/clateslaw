@@ -10,6 +10,8 @@ export const DRIVE_QUERIES = {
       d.speed_max,
       d.power_max,
       d.outside_temp_avg,
+      d.ascent,
+      d.descent,
       COALESCE(sg.name, sa.city) as start_location,
       COALESCE(eg.name, ea.city) as end_location
     FROM drives d

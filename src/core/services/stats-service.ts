@@ -264,4 +264,115 @@ export class StatsService {
 
     return result;
   }
+
+  async getYearlyStats(params: { carId: number; year?: number; includePrevious?: boolean }): Promise<{
+    year: number;
+    periodLabel: string;
+    stats: AggregatedStats;
+    monthlyBreakdown: Array<{
+      month: number;
+      distance: number;
+      duration: number;
+      drives: number;
+      charges: number;
+      energyUsed: number;
+      energyAdded: number;
+      cost: number;
+    }>;
+    comparison?: {
+      distanceChange: number;
+      distanceChangePercent: number;
+      energyChange: number;
+      energyChangePercent: number;
+    };
+  }> {
+    const { carId, year = new Date().getFullYear(), includePrevious = true } = params;
+
+    const from = `${year}-01-01T00:00:00.000Z`;
+    const to = `${year}-12-31T23:59:59.999Z`;
+
+    const [drivingStats, chargingStats, periodStats] = await Promise.all([
+      this.getDrivingStats({ carId, from, to }),
+      this.getChargingStats({ carId, from, to }),
+      this.getPeriodStats({ carId, from, to, period: 'month' }),
+    ]);
+
+    const avgEfficiency = drivingStats.total_distance > 0
+      ? (drivingStats.total_energy_consumed / drivingStats.total_distance) * 1000
+      : 0;
+
+    const stats: AggregatedStats = {
+      period: String(year),
+      periodLabel: `${year}年`,
+      totalDistance: drivingStats.total_distance,
+      totalDuration: drivingStats.total_duration_min,
+      totalDrives: drivingStats.total_drives,
+      totalCharges: chargingStats.total_charges,
+      totalEnergyUsed: drivingStats.total_energy_consumed,
+      totalEnergyAdded: chargingStats.total_energy_added,
+      totalCost: chargingStats.total_cost,
+      avgEfficiency,
+    };
+
+    // 构建月度明细
+    const monthlyBreakdown = Array.from({ length: 12 }, (_, i) => {
+      const monthStr = `${year}-${String(i + 1).padStart(2, '0')}`;
+      const monthData = periodStats.find(p => p.period === monthStr);
+      return {
+        month: i + 1,
+        distance: monthData?.distance ?? 0,
+        duration: 0, // 暂不支持
+        drives: monthData?.drives ?? 0,
+        charges: monthData?.charges ?? 0,
+        energyUsed: monthData?.energy_consumed ?? 0,
+        energyAdded: monthData?.energy_added ?? 0,
+        cost: monthData?.cost ?? 0,
+      };
+    });
+
+    const result = {
+      year,
+      periodLabel: `${year}年`,
+      stats,
+      monthlyBreakdown,
+    } as {
+      year: number;
+      periodLabel: string;
+      stats: AggregatedStats;
+      monthlyBreakdown: typeof monthlyBreakdown;
+      comparison?: {
+        distanceChange: number;
+        distanceChangePercent: number;
+        energyChange: number;
+        energyChangePercent: number;
+      };
+    };
+
+    if (includePrevious) {
+      const prevYear = year - 1;
+      const prevFrom = `${prevYear}-01-01T00:00:00.000Z`;
+      const prevTo = `${prevYear}-12-31T23:59:59.999Z`;
+
+      const [prevDriving, prevCharging] = await Promise.all([
+        this.getDrivingStats({ carId, from: prevFrom, to: prevTo }),
+        this.getChargingStats({ carId, from: prevFrom, to: prevTo }),
+      ]);
+
+      const distanceChange = stats.totalDistance - prevDriving.total_distance;
+      const energyChange = stats.totalEnergyUsed - prevDriving.total_energy_consumed;
+
+      result.comparison = {
+        distanceChange,
+        distanceChangePercent: prevDriving.total_distance > 0
+          ? (distanceChange / prevDriving.total_distance) * 100
+          : 0,
+        energyChange,
+        energyChangePercent: prevDriving.total_energy_consumed > 0
+          ? (energyChange / prevDriving.total_energy_consumed) * 100
+          : 0,
+      };
+    }
+
+    return result;
+  }
 }

@@ -87,6 +87,37 @@ interface MonthlyData {
   };
 }
 
+interface YearlyData {
+  year: number;
+  periodLabel: string;
+  stats: {
+    totalDistance: number;
+    totalDuration: number;
+    totalDrives: number;
+    totalCharges: number;
+    totalEnergyUsed: number;
+    totalEnergyAdded: number;
+    totalCost: number;
+    avgEfficiency: number;
+  };
+  monthlyBreakdown: Array<{
+    month: number;
+    distance: number;
+    duration: number;
+    drives: number;
+    charges: number;
+    energyUsed: number;
+    energyAdded: number;
+    cost: number;
+  }>;
+  comparison?: {
+    distanceChange: number;
+    distanceChangePercent: number;
+    energyChange: number;
+    energyChangePercent: number;
+  };
+}
+
 const execAsync = promisify(exec);
 
 function getNewestMtime(dir: string): number {
@@ -144,6 +175,7 @@ async function startServer(distPath: string): Promise<http.Server> {
         { source: '/daily', destination: '/index.html' },
         { source: '/weekly', destination: '/index.html' },
         { source: '/monthly', destination: '/index.html' },
+        { source: '/yearly', destination: '/index.html' },
       ],
     });
   });
@@ -165,7 +197,7 @@ function getServerPort(server: http.Server): number {
 
 async function takeScreenshot(
   url: string,
-  data: DriveData | ChargeData | DailyData | WeeklyData | MonthlyData,
+  data: DriveData | ChargeData | DailyData | WeeklyData | MonthlyData | YearlyData,
   outputPath: string,
   width: number,
   scale: number
@@ -409,6 +441,33 @@ async function getMonthlyData(carId: number, dateStr?: string): Promise<MonthlyD
   };
 }
 
+async function getYearlyData(carId: number, yearStr?: string): Promise<YearlyData> {
+  const client = getGrafanaClient();
+  const statsService = new StatsService(client);
+
+  const year = yearStr ? parseInt(yearStr, 10) : new Date().getFullYear();
+
+  console.log(`正在获取 ${year} 年度数据...`);
+  const yearlyStats = await statsService.getYearlyStats({ carId, year, includePrevious: true });
+
+  return {
+    year: yearlyStats.year,
+    periodLabel: yearlyStats.periodLabel,
+    stats: {
+      totalDistance: yearlyStats.stats.totalDistance,
+      totalDuration: yearlyStats.stats.totalDuration,
+      totalDrives: yearlyStats.stats.totalDrives,
+      totalCharges: yearlyStats.stats.totalCharges,
+      totalEnergyUsed: yearlyStats.stats.totalEnergyUsed,
+      totalEnergyAdded: yearlyStats.stats.totalEnergyAdded,
+      totalCost: yearlyStats.stats.totalCost,
+      avgEfficiency: yearlyStats.stats.avgEfficiency,
+    },
+    monthlyBreakdown: yearlyStats.monthlyBreakdown,
+    comparison: yearlyStats.comparison,
+  };
+}
+
 async function screenshotDrive(
   id: string | undefined,
   options: ScreenshotOptions
@@ -621,6 +680,38 @@ async function screenshotMonthly(
   }
 }
 
+async function screenshotYearly(
+  yearStr: string | undefined,
+  options: ScreenshotOptions
+): Promise<void> {
+  const width = parseInt(options.width || String(SCREENSHOT.DEFAULT_WIDTH), 10);
+  const scale = parseInt(options.scale || String(SCREENSHOT.DEFAULT_SCALE), 10);
+  const carId = parseInt(options.carId || '1', 10);
+
+  const data = await getYearlyData(carId, yearStr);
+
+  const outputPath = options.output || `yearly-${data.year}.png`;
+
+  const distPath = await ensureWebBuild();
+
+  const server = await startServer(distPath);
+  const port = getServerPort(server);
+
+  try {
+    const theme = options.theme || 'tesla';
+    await takeScreenshot(
+      `http://localhost:${port}/yearly?theme=${theme}`,
+      data,
+      outputPath,
+      width,
+      scale
+    );
+    await sendAndCleanup(outputPath, options, `${data.periodLabel} 年报截图`);
+  } finally {
+    server.close();
+  }
+}
+
 /**
  * 解析查询输入（支持 JSON 字符串或文件路径）
  */
@@ -646,7 +737,7 @@ function validateQuery(query: unknown): query is TeslaQuery {
   return true;
 }
 
-type PageType = 'drive' | 'charge' | 'daily' | 'weekly' | 'monthly';
+type PageType = 'drive' | 'charge' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 /**
  * 根据查询类型确定页面类型
@@ -679,7 +770,7 @@ async function fetchDataForScreenshot(
   query: TeslaQuery,
   pageType: PageType,
   carId: number
-): Promise<DriveData | ChargeData | DailyData | WeeklyData | MonthlyData> {
+): Promise<DriveData | ChargeData | DailyData | WeeklyData | MonthlyData | YearlyData> {
   switch (pageType) {
     case 'drive': {
       // 如果有明确的 recordId
@@ -745,6 +836,12 @@ async function fetchDataForScreenshot(
       const date = query.screenshot?.date;
       return getMonthlyData(carId, date);
     }
+
+    case 'yearly': {
+      const date = query.screenshot?.date;
+      const year = date ? date.split('-')[0] : undefined;
+      return getYearlyData(carId, year);
+    }
   }
 }
 
@@ -754,7 +851,7 @@ async function fetchDataForScreenshot(
 function generateOutputPath(
   query: TeslaQuery,
   pageType: PageType,
-  data: DriveData | ChargeData | DailyData | WeeklyData | MonthlyData
+  data: DriveData | ChargeData | DailyData | WeeklyData | MonthlyData | YearlyData
 ): string {
   const timestamp = Date.now();
   switch (pageType) {
@@ -768,6 +865,8 @@ function generateOutputPath(
       return `weekly-${(data as WeeklyData).period}-${timestamp}.png`;
     case 'monthly':
       return `monthly-${(data as MonthlyData).period}-${timestamp}.png`;
+    case 'yearly':
+      return `yearly-${(data as YearlyData).year}-${timestamp}.png`;
   }
 }
 
@@ -777,7 +876,7 @@ function generateOutputPath(
 function generateMessage(
   query: TeslaQuery,
   pageType: PageType,
-  data: DriveData | ChargeData | DailyData | WeeklyData | MonthlyData
+  data: DriveData | ChargeData | DailyData | WeeklyData | MonthlyData | YearlyData
 ): string {
   switch (pageType) {
     case 'drive':
@@ -790,6 +889,8 @@ function generateMessage(
       return `${(data as WeeklyData).periodLabel} 周报截图`;
     case 'monthly':
       return `${(data as MonthlyData).periodLabel} 月报截图`;
+    case 'yearly':
+      return `${(data as YearlyData).periodLabel} 年报截图`;
   }
 }
 
@@ -930,6 +1031,20 @@ export const screenshotCommand = new Command('screenshot')
       .option('-m, --message <text>', '自定义消息')
       .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
       .action(screenshotMonthly)
+  )
+  .addCommand(
+    new Command('yearly')
+      .description('Screenshot yearly overview')
+      .argument('[year]', 'Year (YYYY, defaults to current year)')
+      .option('-o, --output <path>', 'Output file path')
+      .option('-w, --width <number>', 'Viewport width', String(SCREENSHOT.DEFAULT_WIDTH))
+      .option('--scale <number>', 'Device pixel ratio', String(SCREENSHOT.DEFAULT_SCALE))
+      .option('-c, --car-id <number>', 'Car ID', '1')
+      .option('-s, --send', '发送到 Telegram 后删除文件')
+      .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
+      .option('-m, --message <text>', '自定义消息')
+      .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
+      .action(screenshotYearly)
   )
   .addCommand(
     new Command('query')

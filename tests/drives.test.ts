@@ -18,6 +18,8 @@ interface DriveRecord {
   outside_temp_avg: number;
   start_location: string | null;
   end_location: string | null;
+  ascent: number | null;
+  descent: number | null;
 }
 
 const CAR_ID = 1;
@@ -121,6 +123,23 @@ describe('Drives', () => {
           record.speed_max < 300,
           `Unreasonable speed_max ${record.speed_max} for record ${record.id}`
         ).toBe(true);
+      });
+    });
+
+    it('should have valid ascent/descent values when present', () => {
+      records.forEach((record) => {
+        if (record.ascent !== null && record.ascent !== undefined) {
+          expect(
+            isNonNegative(record.ascent),
+            `Negative ascent for record ${record.id}`
+          ).toBe(true);
+        }
+        if (record.descent !== null && record.descent !== undefined) {
+          expect(
+            isNonNegative(record.descent),
+            `Negative descent for record ${record.id}`
+          ).toBe(true);
+        }
       });
     });
   });

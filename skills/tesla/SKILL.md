@@ -5,12 +5,20 @@ homepage: https://github.com/nicekate/clateslaw
 metadata:
   openclaw:
     emoji: "🚗"
+    version: "1.0.0"
     requires:
       bins:
         - tesla
+        - openclaw
       env:
         - GRAFANA_URL
         - GRAFANA_TOKEN
+        - OPENCLAW_CHANNEL
+        - OPENCLAW_TARGET
+    optional_env:
+      - MQTT_HOST
+      - MQTT_PORT
+      - VITE_AMAP_KEY
 ---
 
 # Tesla 自然语言查询 Skill
@@ -43,6 +51,8 @@ metadata:
 | "上周周报" | `screenshot` | screenshot.type: weekly, date: 上周某天日期 |
 | "本月汇总" / "月报" | `screenshot` | screenshot.type: monthly |
 | "上月月报" | `screenshot` | screenshot.type: monthly, date: 上月某天日期 |
+| "年报" / "今年汇总" / "年度报告" | `screenshot` | screenshot.type: yearly |
+| "去年年报" / "2024年报" | `screenshot` | screenshot.type: yearly, date: 指定年份 |
 | "行程 123 详情" / "查看行程 123" | `detail.drive` | recordId: 123 |
 | "充电 456 详情" / "查看充电 456" | `detail.charge` | recordId: 456 |
 
@@ -61,6 +71,7 @@ metadata:
 | "去过哪里" / "常去地点" / "位置统计" | `locations` | 返回位置统计数据 |
 | "充电站分析" / "充电站统计" / "常用充电站" | `locations.charging` | 返回充电站使用统计（超充/家充比例等） |
 | "软件版本" / "更新记录" / "固件版本" | `updates` | 返回固件更新历史 |
+| "轮胎压力" / "胎压" / "TPMS" | `tpms` | 返回轮胎压力监测数据 |
 
 ## 时间映射表
 

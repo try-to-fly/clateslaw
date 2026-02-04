@@ -95,6 +95,8 @@ export const demoDriveData: DemoDriveData = {
     outside_temp_avg: 7.2,
     start_location: '北京市朝阳区',
     end_location: '北京市海淀区',
+    ascent: 45,
+    descent: 32,
   },
   positions: generateDemoPositions(),
 };

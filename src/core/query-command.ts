@@ -102,6 +102,11 @@ export function queryToCommand(query: TeslaQuery): string {
       if (query.period) parts.push('-p', query.period);
       break;
 
+    case 'tpms':
+      parts.push('tpms', String(query.carId ?? 1));
+      parts.push('-f', from, '-t', to);
+      break;
+
     case 'detail.drive':
       parts.push('detail', 'drive', String(query.recordId ?? 0));
       break;

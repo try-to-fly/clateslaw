@@ -5,6 +5,7 @@ import ChargePage from './pages/ChargePage';
 import DailyPage from './pages/DailyPage';
 import WeeklyPage from './pages/WeeklyPage';
 import MonthlyPage from './pages/MonthlyPage';
+import YearlyPage from './pages/YearlyPage';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/daily" element={<DailyPage />} />
         <Route path="/weekly" element={<WeeklyPage />} />
         <Route path="/monthly" element={<MonthlyPage />} />
+        <Route path="/yearly" element={<YearlyPage />} />
       </Routes>
     </BrowserRouter>
   );

@@ -85,7 +85,38 @@ export interface MonthlyData {
   };
 }
 
-export type TeslaData = DriveData | ChargeData | DailyData | HomeData | WeeklyData | MonthlyData;
+export interface YearlyData {
+  year: number;
+  periodLabel: string;
+  stats: {
+    totalDistance: number;
+    totalDuration: number;
+    totalDrives: number;
+    totalCharges: number;
+    totalEnergyUsed: number;
+    totalEnergyAdded: number;
+    totalCost: number;
+    avgEfficiency: number;
+  };
+  monthlyBreakdown: Array<{
+    month: number;
+    distance: number;
+    duration: number;
+    drives: number;
+    charges: number;
+    energyUsed: number;
+    energyAdded: number;
+    cost: number;
+  }>;
+  comparison?: {
+    distanceChange: number;
+    distanceChangePercent: number;
+    energyChange: number;
+    energyChangePercent: number;
+  };
+}
+
+export type TeslaData = DriveData | ChargeData | DailyData | HomeData | WeeklyData | MonthlyData | YearlyData;
 
 function getDemoData(): TeslaData | null {
   if (!import.meta.env.DEV) {

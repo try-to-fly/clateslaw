@@ -20,7 +20,8 @@ export type QueryType =
   | 'detail.charge'
   | 'screenshot'
   | 'car'
-  | 'cars';
+  | 'cars'
+  | 'tpms';
 
 /** 语义时间 */
 export type SemanticTime =
@@ -78,7 +79,7 @@ export interface PaginationConfig {
 
 /** 截图配置 */
 export interface ScreenshotConfig {
-  type: 'drive' | 'charge' | 'daily' | 'weekly' | 'monthly';
+  type: 'drive' | 'charge' | 'daily' | 'weekly' | 'monthly' | 'yearly';
   id?: number;
   date?: string;
   send?: boolean;

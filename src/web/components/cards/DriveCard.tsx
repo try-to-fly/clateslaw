@@ -14,6 +14,8 @@ export function DriveCard({ drive, theme = 'tesla' }: DriveCardProps) {
 
   const avgSpeed = formatSpeed(drive.distance / (drive.duration_min / 60));
 
+  const hasElevation = drive.ascent !== null && drive.descent !== null;
+
   const cardClass = theme === 'cyberpunk'
     ? 'theme-card cyber-border rounded-lg overflow-hidden'
     : theme === 'glass'
@@ -32,7 +34,7 @@ export function DriveCard({ drive, theme = 'tesla' }: DriveCardProps) {
         <h3 className="text-sm font-medium theme-text">行程概要</h3>
       </div>
       <div className="p-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className={`grid ${hasElevation ? 'grid-cols-3' : 'grid-cols-2'} gap-4`}>
           <div className="text-center">
             <div className={valueClass}>{formatDistance(drive.distance)}</div>
             <div className="text-xs theme-text-muted mt-1">距离</div>
@@ -49,6 +51,18 @@ export function DriveCard({ drive, theme = 'tesla' }: DriveCardProps) {
             <div className={valueClass}>{efficiency}</div>
             <div className="text-xs theme-text-muted mt-1">Wh/km</div>
           </div>
+          {hasElevation && (
+            <>
+              <div className="text-center">
+                <div className={valueClass}>↑{drive.ascent}m</div>
+                <div className="text-xs theme-text-muted mt-1">爬升</div>
+              </div>
+              <div className="text-center">
+                <div className={valueClass}>↓{drive.descent}m</div>
+                <div className="text-xs theme-text-muted mt-1">下降</div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

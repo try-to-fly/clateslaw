@@ -17,6 +17,7 @@ import {
   ProjectedRangeService,
   StatsService,
 } from './index.js';
+import { TPMSService } from './services/tpms-service.js';
 
 export { queryToCommand } from './query-command.js';
 
@@ -186,6 +187,12 @@ export async function executeQuery(query: TeslaQuery): Promise<QueryResult> {
           to,
           period: query.period ?? 'day',
         });
+        break;
+      }
+
+      case 'tpms': {
+        const service = new TPMSService(client);
+        data = await service.getStats(carId, { from, to });
         break;
       }
 

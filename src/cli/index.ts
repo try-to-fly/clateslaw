@@ -18,6 +18,7 @@ import { detailCommand } from './commands/detail/index.js';
 import { screenshotCommand } from './commands/screenshot.js';
 import { mqttCommand } from './commands/mqtt.js';
 import { queryCommandDef } from './commands/query.js';
+import { tpmsCommand } from './commands/tpms.js';
 
 const program = new Command();
 
@@ -139,6 +140,14 @@ program
   .option('-t, --to <date>', 'End time', 'now')
   .option('-l, --limit <number>', 'Record limit', '30')
   .action(projectedRangeCommand);
+
+program
+  .command('tpms <car-id>')
+  .description('Tire pressure monitoring (TPMS)')
+  .option('-o, --output <format>', 'Output format: table | json', 'table')
+  .option('-f, --from <date>', 'Start time', 'now-30d')
+  .option('-t, --to <date>', 'End time', 'now')
+  .action(tpmsCommand);
 
 program.addCommand(statsCommand);
 program.addCommand(detailCommand);
