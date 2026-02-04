@@ -17,6 +17,7 @@ import {
   TimelineService,
   ProjectedRangeService,
   StatsService,
+  TPMSService,
 } from '../src/core/index.js';
 import type { Car } from '../src/types/car.js';
 
@@ -70,6 +71,7 @@ class DataCollector {
   private timelineService = new TimelineService(this.client);
   private projectedRangeService = new ProjectedRangeService(this.client);
   private statsService = new StatsService(this.client);
+  private tpmsService = new TPMSService(this.client);
 
   async run(): Promise<void> {
     console.log('🚀 开始数据采集...\n');
@@ -259,6 +261,22 @@ class DataCollector {
       ),
       this.collect('stats/period', `${carDir}/stats/period.json`, () =>
         this.statsService.getPeriodStats({ carId: car.id, ...period })
+      ),
+      this.collect('stats/yearly', `${carDir}/stats/yearly.json`, () =>
+        this.statsService.getYearlyStats({ carId: car.id })
+      ),
+
+      // TPMS
+      this.collect('tpms/latest', `${carDir}/tpms/latest.json`, () =>
+        this.tpmsService.getLatest(car.id)
+      ),
+      this.collect('tpms/stats', `${carDir}/tpms/stats.json`, () =>
+        this.tpmsService.getStats(car.id, { ...defaultRange })
+      ),
+
+      // Charging Stations
+      this.collect('locations/charging-stations', `${carDir}/locations/charging-stations.json`, () =>
+        this.locationService.getChargingStations({ carId: car.id, ...locations })
       ),
     ]);
 

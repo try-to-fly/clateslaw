@@ -15,6 +15,7 @@ import {
   LocationService,
   TimelineService,
   ProjectedRangeService,
+  TPMSService,
 } from './services/index.js';
 
 let clientInstance: GrafanaClient | null = null;
@@ -102,6 +103,11 @@ export function createTimelineService(): TimelineService {
 /** 创建续航预测服务 */
 export function createProjectedRangeService(): ProjectedRangeService {
   return new ProjectedRangeService(getGrafanaClient());
+}
+
+/** 创建 TPMS 服务 */
+export function createTPMSService(): TPMSService {
+  return new TPMSService(getGrafanaClient());
 }
 
 export { GrafanaClient, GrafanaApiError, GrafanaQueryError } from './grafana-client.js';
