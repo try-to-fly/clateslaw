@@ -136,7 +136,7 @@ const ROUTE_COLOR_SCHEMES = [
 export function getSpeedColorByRoute(
   speed: number,
   routeIndex: number,
-  theme: 'tesla' | 'cyberpunk' | 'glass' = 'tesla'
+  _theme: 'tesla' | 'cyberpunk' | 'glass' = 'tesla'
 ): string {
   const scheme = ROUTE_COLOR_SCHEMES[routeIndex % ROUTE_COLOR_SCHEMES.length];
 

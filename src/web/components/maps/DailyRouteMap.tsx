@@ -99,12 +99,9 @@ export function DailyRouteMap({ allPositions, theme = 'tesla' }: DailyRouteMapPr
 
   return (
     <div className={cardClass}>
-      <div className="px-4 py-3 border-b border-[var(--theme-card-border)]">
-        <h3 className="text-sm font-medium theme-text">今日行驶轨迹</h3>
-      </div>
       <AMapContainer
         onMapReady={handleMapReady}
-        className="h-64 w-full"
+        className="h-80 w-full"
         theme={theme}
       />
     </div>

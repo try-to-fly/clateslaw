@@ -1,10 +1,8 @@
 import { useData, type ChargeData } from '../hooks/useData';
 import { useTheme } from '../hooks/useTheme';
-import { ChargeCard } from '../components/cards/ChargeCard';
-import { StatsCard } from '../components/cards/StatsCard';
+import { BatteryRing } from '../components/charts/BatteryRing';
 import { ChargeCurve } from '../components/charts/ChargeCurve';
-import { BatteryGauge } from '../components/charts/BatteryGauge';
-import { formatDate, formatEnergy } from '../lib/utils';
+import { formatDuration } from '../lib/utils';
 
 export default function ChargePage() {
   const data = useData<ChargeData>();
@@ -20,47 +18,86 @@ export default function ChargePage() {
 
   const { charge, curve } = data;
 
-  const cardClass = theme === 'cyberpunk'
-    ? 'theme-card cyber-border rounded-lg overflow-hidden'
-    : theme === 'glass'
-    ? 'theme-card glass-card rounded-xl overflow-hidden'
-    : 'theme-card rounded-lg overflow-hidden';
+  const efficiency =
+    charge.charge_energy_used > 0
+      ? ((charge.charge_energy_added / charge.charge_energy_used) * 100).toFixed(0)
+      : '100';
+
+  const cardClass =
+    theme === 'cyberpunk'
+      ? 'theme-card cyber-border rounded-lg overflow-hidden'
+      : theme === 'glass'
+        ? 'theme-card glass-card rounded-xl overflow-hidden'
+        : 'theme-card rounded-lg overflow-hidden';
+
+  const levelChange = charge.end_battery_level - charge.start_battery_level;
 
   return (
-    <div className="theme-bg p-4 space-y-4 screenshot-container">
-      <ChargeCard charge={charge} theme={theme} />
-
+    <div className="theme-bg p-2 space-y-2 screenshot-container">
+      {/* 标题行：位置 + 时长 */}
       <div className={cardClass}>
-        <div className="px-4 py-3 border-b border-[var(--theme-card-border)]">
-          <h3 className="text-sm font-medium theme-text">电量变化</h3>
-        </div>
-        <div className="p-4">
-          <BatteryGauge
-            startLevel={charge.start_battery_level}
-            endLevel={charge.end_battery_level}
-            theme={theme}
-          />
+        <div className="px-2.5 py-1.5 flex items-center justify-between">
+          <span className="text-sm font-medium theme-text flex items-center gap-1">
+            <span>⚡</span>
+            {charge.location || '充电'}
+          </span>
+          <span className="text-sm theme-text-secondary">{formatDuration(charge.duration_min)}</span>
         </div>
       </div>
 
-      {curve.length > 0 && <ChargeCurve data={curve} theme={theme} />}
+      {/* 主内容：圆环 + 右侧数据 */}
+      <div className={cardClass}>
+        <div className="px-2.5 py-2 flex items-center gap-3">
+          {/* 左侧圆环 100px */}
+          <BatteryRing
+            level={charge.end_battery_level}
+            startLevel={charge.start_battery_level}
+            size="sm"
+            showChange={false}
+            isCharging={true}
+            theme={theme}
+          />
+          {/* 右侧数据 */}
+          <div className="flex-1">
+            {/* 电量变化大字 */}
+            <div className="text-center mb-2">
+              <span className="text-lg font-bold" style={{ color: 'var(--theme-success)' }}>
+                +{levelChange}%
+              </span>
+            </div>
+            {/* 数据网格 */}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+              <div>
+                <span className="theme-text-muted">充入 </span>
+                <span className="font-semibold" style={{ color: 'var(--theme-success)' }}>
+                  {charge.charge_energy_added.toFixed(1)}
+                </span>
+                <span className="theme-text-muted"> kWh</span>
+              </div>
+              <div>
+                <span className="theme-text-muted">消耗 </span>
+                <span className="font-semibold theme-text">
+                  {charge.charge_energy_used.toFixed(1)}
+                </span>
+                <span className="theme-text-muted"> kWh</span>
+              </div>
+              <div>
+                <span className="theme-text-muted">效率 </span>
+                <span className="font-semibold theme-text">{efficiency}%</span>
+              </div>
+              <div>
+                <span className="theme-text-muted">费用 </span>
+                <span className="font-semibold theme-text">
+                  {charge.cost !== null ? `¥${charge.cost.toFixed(0)}` : '-'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <StatsCard
-        title="详细信息"
-        theme={theme}
-        items={[
-          { label: '充电位置', value: charge.location || '未知' },
-          { label: '开始时间', value: formatDate(charge.start_date) },
-          { label: '结束时间', value: formatDate(charge.end_date) },
-          { label: '消耗电量', value: formatEnergy(charge.charge_energy_used) },
-          {
-            label: '充电效率',
-            value: charge.charge_energy_used > 0
-              ? `${((charge.charge_energy_added / charge.charge_energy_used) * 100).toFixed(1)}%`
-              : '-',
-          },
-        ]}
-      />
+      {/* 充电曲线 h-32 (128px) */}
+      {curve.length > 0 && <ChargeCurve data={curve} theme={theme} />}
     </div>
   );
 }

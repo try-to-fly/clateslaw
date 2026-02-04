@@ -9,9 +9,11 @@ interface DriveRouteProps {
   startLocation?: string;
   endLocation?: string;
   theme?: ThemeType;
+  bare?: boolean;
+  height?: string;
 }
 
-export function DriveRoute({ positions, startLocation, endLocation, theme = 'tesla' }: DriveRouteProps) {
+export function DriveRoute({ positions, startLocation, endLocation, theme = 'tesla', bare = false, height = 'h-80' }: DriveRouteProps) {
   const handleMapReady = useCallback(
     (map: any, AMap: any) => {
       if (positions.length === 0) return;
@@ -73,30 +75,21 @@ export function DriveRoute({ positions, startLocation, endLocation, theme = 'tes
     ? 'theme-card glass-card rounded-xl overflow-hidden'
     : 'theme-card rounded-lg overflow-hidden';
 
+  const mapElement = (
+    <AMapContainer
+      onMapReady={handleMapReady}
+      className={`${height} w-full`}
+      theme={theme}
+    />
+  );
+
+  if (bare) {
+    return mapElement;
+  }
+
   return (
     <div className={cardClass}>
-      <div className="px-4 py-3 border-b border-[var(--theme-card-border)]">
-        <h3 className="text-sm font-medium theme-text">行程轨迹</h3>
-      </div>
-      <AMapContainer
-        onMapReady={handleMapReady}
-        className="h-64 w-full"
-        theme={theme}
-      />
-      {(startLocation || endLocation) && (
-        <div className="px-4 py-3 border-t border-[var(--theme-card-border)]">
-          <div className="flex flex-col gap-1.5 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-500 text-white text-[10px]">起</span>
-              <span className="theme-text-secondary truncate">{startLocation || '未知'}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[10px]">终</span>
-              <span className="theme-text-secondary truncate">{endLocation || '未知'}</span>
-            </div>
-          </div>
-        </div>
-      )}
+      {mapElement}
     </div>
   );
 }

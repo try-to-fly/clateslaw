@@ -13,6 +13,15 @@
   --theme-error: #ef4444;
   --theme-gradient: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
   --theme-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  /* 发光效果 */
+  --theme-glow-accent: 0 0 20px rgba(232, 33, 39, 0.3);
+  --theme-glow-success: 0 0 20px rgba(34, 197, 94, 0.3);
+  /* 渐变增强 */
+  --theme-accent-gradient: linear-gradient(135deg, #e82127 0%, #ff4d52 100%);
+  --theme-success-gradient: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  /* 圆环颜色 */
+  --theme-ring-bg: rgba(255, 255, 255, 0.1);
+  --theme-ring-track: rgba(255, 255, 255, 0.05);
 }
 
 /* Tesla 主题 - 深黑背景 + 红色强调色 */
@@ -30,6 +39,12 @@
   --theme-error: #ef4444;
   --theme-gradient: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
   --theme-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --theme-glow-accent: 0 0 20px rgba(232, 33, 39, 0.3);
+  --theme-glow-success: 0 0 20px rgba(34, 197, 94, 0.3);
+  --theme-accent-gradient: linear-gradient(135deg, #e82127 0%, #ff4d52 100%);
+  --theme-success-gradient: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  --theme-ring-bg: rgba(255, 255, 255, 0.1);
+  --theme-ring-track: rgba(255, 255, 255, 0.05);
 }
 
 /* Cyberpunk 主题 - 霓虹渐变、发光效果 */
@@ -48,6 +63,12 @@
   --theme-gradient: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #2d1b4e 100%);
   --theme-card-shadow: 0 0 20px rgba(0, 245, 255, 0.15);
   --theme-glow: 0 0 10px currentColor;
+  --theme-glow-accent: 0 0 20px rgba(0, 245, 255, 0.4);
+  --theme-glow-success: 0 0 20px rgba(0, 255, 136, 0.4);
+  --theme-accent-gradient: linear-gradient(135deg, #00f5ff 0%, #00d4ff 50%, #00b8ff 100%);
+  --theme-success-gradient: linear-gradient(135deg, #00cc6a 0%, #00ff88 100%);
+  --theme-ring-bg: rgba(0, 245, 255, 0.15);
+  --theme-ring-track: rgba(0, 245, 255, 0.05);
 }
 
 /* Glass 主题 - 毛玻璃效果 */
@@ -66,6 +87,12 @@
   --theme-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   --theme-card-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   --theme-blur: blur(12px);
+  --theme-glow-accent: 0 0 20px rgba(59, 130, 246, 0.3);
+  --theme-glow-success: 0 0 20px rgba(34, 197, 94, 0.3);
+  --theme-accent-gradient: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+  --theme-success-gradient: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  --theme-ring-bg: rgba(59, 130, 246, 0.15);
+  --theme-ring-track: rgba(255, 255, 255, 0.05);
 }
 
 /* 主题通用样式 */

@@ -45,3 +45,68 @@ body {
 .screenshot-container {
   min-width: var(--screenshot-width, 402px);
 }
+
+/* Hero 数字样式 */
+.hero-number {
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.hero-number-sm {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.hero-unit {
+  font-size: 1rem;
+  font-weight: 500;
+  opacity: 0.8;
+  margin-left: 0.25rem;
+}
+
+.hero-unit-sm {
+  font-size: 0.875rem;
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+/* 圆环动画 */
+@keyframes ring-fill {
+  from {
+    stroke-dashoffset: var(--ring-circumference, 565.48);
+  }
+  to {
+    stroke-dashoffset: var(--ring-offset, 0);
+  }
+}
+
+.ring-animate {
+  animation: ring-fill 1s ease-out forwards;
+}
+
+/* 发光效果 */
+.glow-accent {
+  filter: drop-shadow(var(--theme-glow-accent));
+}
+
+.glow-success {
+  filter: drop-shadow(var(--theme-glow-success));
+}
+
+/* 渐变文字 */
+.text-gradient-accent {
+  background: var(--theme-accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-success {
+  background: var(--theme-success-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}

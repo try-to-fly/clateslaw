@@ -38,6 +38,10 @@ export class MqttService {
     this.client = mqtt.connect(brokerUrl, {
       clientId: `tesla-service-${Date.now()}`,
       reconnectPeriod: 5000,
+      keepalive: 30,           // 30秒心跳，更频繁保持连接
+      connectTimeout: 30000,   // 30秒连接超时
+      clean: true,             // 清除旧会话
+      resubscribe: true,       // 重连后自动重订阅
     });
 
     this.client.on('connect', () => {
@@ -45,8 +49,8 @@ export class MqttService {
       this.subscribe();
     });
 
-    this.client.on('error', (err) => {
-      console.error('MQTT 错误:', err.message);
+    this.client.on('error', (err: Error & { code?: string }) => {
+      console.error('MQTT 错误:', err.message, err.code ? `(${err.code})` : '');
     });
 
     this.client.on('reconnect', () => {
@@ -59,6 +63,14 @@ export class MqttService {
 
     this.client.on('close', () => {
       console.log('MQTT 连接已关闭');
+    });
+
+    this.client.on('offline', () => {
+      console.log('MQTT 客户端离线（网络不可用）');
+    });
+
+    this.client.on('disconnect', (packet) => {
+      console.log('收到 Broker 断开请求:', packet?.reasonCode || '未知原因');
     });
   }
 

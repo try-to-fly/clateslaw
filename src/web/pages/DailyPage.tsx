@@ -1,7 +1,5 @@
 import { useData, type DailyData } from '../hooks/useData';
 import { useTheme } from '../hooks/useTheme';
-import { StatsCard } from '../components/cards/StatsCard';
-import { EnergyBar } from '../components/charts/EnergyBar';
 import { DailyRouteMap } from '../components/maps/DailyRouteMap';
 import {
   formatDistance,
@@ -24,113 +22,124 @@ export default function DailyPage() {
 
   const { date, drives, charges, allPositions, stats } = data;
 
-  const cardClass = theme === 'cyberpunk'
-    ? 'theme-card cyber-border rounded-lg overflow-hidden'
-    : theme === 'glass'
-    ? 'theme-card glass-card rounded-xl overflow-hidden'
-    : 'theme-card rounded-lg overflow-hidden';
+  const cardClass =
+    theme === 'cyberpunk'
+      ? 'theme-card cyber-border rounded-lg overflow-hidden'
+      : theme === 'glass'
+        ? 'theme-card glass-card rounded-xl overflow-hidden'
+        : 'theme-card rounded-lg overflow-hidden';
 
-  const itemBgClass = theme === 'cyberpunk'
-    ? 'bg-[rgba(0,245,255,0.1)]'
-    : theme === 'glass'
-    ? 'bg-[rgba(255,255,255,0.05)]'
-    : 'bg-[rgba(255,255,255,0.05)]';
+  const accentColor =
+    theme === 'cyberpunk' ? '#00f5ff' : theme === 'glass' ? '#3b82f6' : '#e82127';
+
+  const avgEfficiency =
+    stats.totalDistance > 0
+      ? (stats.totalEnergyUsed / stats.totalDistance) * 1000
+      : 0;
+
+  const batteryChange = stats.totalEnergyAdded - stats.totalEnergyUsed;
+  const batteryChangePercent = Math.round(batteryChange / 0.75);
 
   return (
-    <div className="theme-bg p-4 space-y-4 screenshot-container">
+    <div className="theme-bg p-2 space-y-2 screenshot-container">
+      {/* 日期标题 */}
       <div className={cardClass}>
-        <div className="px-4 py-3">
-          <h3 className="text-base font-medium theme-text">
+        <div className="px-2.5 py-1.5">
+          <span className="text-sm font-medium theme-text flex items-center gap-1">
+            <span>📅</span>
             {new Date(date).toLocaleDateString('zh-CN', {
               year: 'numeric',
               month: 'long',
               day: 'numeric',
-              weekday: 'long',
+              weekday: 'short',
             })}
-          </h3>
+          </span>
         </div>
       </div>
 
-      <StatsCard
-        title="今日统计"
-        theme={theme}
-        items={[
-          { label: '总里程', value: formatDistance(stats.totalDistance), highlight: true },
-          { label: '总时长', value: formatDuration(stats.totalDuration) },
-          { label: '消耗电量', value: formatEnergy(stats.totalEnergyUsed) },
-          { label: '充入电量', value: formatEnergy(stats.totalEnergyAdded) },
-        ]}
-      />
+      {/* Hero 数据区 */}
+      <div className={cardClass}>
+        <div className="px-2.5 py-2">
+          {/* 主数据：总里程 + 总时长 */}
+          <div className="flex items-center justify-center gap-8 mb-1.5">
+            <div className="text-center">
+              <span className="text-2xl font-bold" style={{ color: accentColor }}>
+                {stats.totalDistance.toFixed(1)}
+              </span>
+              <span className="text-sm font-normal theme-text-muted ml-1">km</span>
+            </div>
+            <div className="text-center">
+              <span className="text-lg font-semibold theme-text">
+                {formatDuration(stats.totalDuration)}
+              </span>
+            </div>
+          </div>
+          {/* 次要数据：能耗 + 电量变化 */}
+          <div className="flex items-center justify-center gap-6 text-xs theme-text-muted">
+            <span>{avgEfficiency.toFixed(0)} Wh/km</span>
+            <span style={{ color: batteryChangePercent >= 0 ? 'var(--theme-success)' : 'var(--theme-error)' }}>
+              {batteryChangePercent >= 0 ? '+' : ''}{batteryChangePercent}% 电量
+            </span>
+          </div>
+        </div>
+      </div>
 
+      {/* 轨迹地图 h-36 (144px) */}
       {allPositions && allPositions.length > 0 && (
         <DailyRouteMap allPositions={allPositions} theme={theme} />
       )}
 
+      {/* 行程列表 - 紧凑 */}
       {drives.length > 0 && (
         <div className={cardClass}>
-          <div className="px-4 py-3 border-b border-[var(--theme-card-border)]">
-            <h3 className="text-sm font-medium theme-text">今日行程 ({drives.length})</h3>
+          <div className="px-2.5 py-1 border-b border-[var(--theme-card-border)] flex items-center justify-between">
+            <span className="text-xs font-medium theme-text">🚗 行程 ({drives.length})</span>
+            <span className="text-xs theme-text-muted">
+              耗电 {formatEnergy(stats.totalEnergyUsed)}
+            </span>
           </div>
-          <div className="p-4 space-y-2">
+          <div className="divide-y divide-[var(--theme-card-border)]">
             {drives.map((drive) => (
-              <div
-                key={drive.id}
-                className={`flex justify-between items-center p-2 rounded ${itemBgClass}`}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium theme-text truncate">
-                    {drive.start_location} → {drive.end_location}
-                  </div>
-                  <div className="text-xs theme-text-muted">
-                    {formatTime(drive.start_date)} - {formatTime(drive.end_date)}
-                  </div>
+              <div key={drive.id} className="px-2.5 py-1 flex items-center justify-between text-xs">
+                <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                  <span className="theme-text-muted w-10 shrink-0">{formatTime(drive.start_date)}</span>
+                  <span className="theme-text truncate">
+                    {drive.start_location}→{drive.end_location}
+                  </span>
                 </div>
-                <div className="text-right ml-2">
-                  <div className="text-sm font-medium theme-accent">
-                    {formatDistance(drive.distance)}
-                  </div>
-                  <div className="text-xs theme-text-muted">
-                    {formatDuration(drive.duration_min)}
-                  </div>
-                </div>
+                <span className="font-medium ml-2" style={{ color: accentColor }}>
+                  {formatDistance(drive.distance)}
+                </span>
               </div>
             ))}
           </div>
         </div>
       )}
 
+      {/* 充电列表 - 紧凑 */}
       {charges.length > 0 && (
         <div className={cardClass}>
-          <div className="px-4 py-3 border-b border-[var(--theme-card-border)]">
-            <h3 className="text-sm font-medium theme-text">今日充电 ({charges.length})</h3>
+          <div className="px-2.5 py-1 border-b border-[var(--theme-card-border)] flex items-center justify-between">
+            <span className="text-xs font-medium theme-text">⚡ 充电 ({charges.length})</span>
+            <span className="text-xs" style={{ color: 'var(--theme-success)' }}>
+              +{formatEnergy(stats.totalEnergyAdded)}
+            </span>
           </div>
-          <div className="p-4 space-y-2">
+          <div className="divide-y divide-[var(--theme-card-border)]">
             {charges.map((charge) => (
-              <div
-                key={charge.id}
-                className={`flex justify-between items-center p-2 rounded ${itemBgClass}`}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium theme-text truncate">{charge.location}</div>
-                  <div className="text-xs theme-text-muted">
-                    {formatTime(charge.start_date)} - {formatTime(charge.end_date)}
-                  </div>
+              <div key={charge.id} className="px-2.5 py-1 flex items-center justify-between text-xs">
+                <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                  <span className="theme-text-muted w-10 shrink-0">{formatTime(charge.start_date)}</span>
+                  <span className="theme-text truncate">{charge.location}</span>
                 </div>
-                <div className="text-right ml-2">
-                  <div className="text-sm font-medium" style={{ color: 'var(--theme-success)' }}>
-                    +{formatEnergy(charge.charge_energy_added)}
-                  </div>
-                  <div className="text-xs theme-text-muted">
-                    {charge.start_battery_level}% → {charge.end_battery_level}%
-                  </div>
-                </div>
+                <span className="font-medium ml-2" style={{ color: 'var(--theme-success)' }}>
+                  {charge.start_battery_level}→{charge.end_battery_level}%
+                </span>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      {drives.length > 1 && <EnergyBar drives={drives} theme={theme} />}
     </div>
   );
 }
