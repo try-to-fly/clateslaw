@@ -18,8 +18,8 @@ interface ChargeCurveProps {
 }
 
 export function ChargeCurve({ data, theme = 'tesla' }: ChargeCurveProps) {
-  const chartData = data.map((point, index) => ({
-    time: index,
+  const chartData = data.map((point) => ({
+    time: point.date,
     power: point.charger_power || 0,
     soc: point.battery_level || 0,
     energy: point.charge_energy_added || 0,
@@ -100,7 +100,10 @@ export function ChargeCurve({ data, theme = 'tesla' }: ChargeCurveProps) {
               <XAxis
                 dataKey="time"
                 tick={{ fontSize: 10, fill: textColor }}
-                tickFormatter={(v) => `${Math.round(v * 5)}m`}
+                tickFormatter={(v) => {
+                  const date = new Date(v);
+                  return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                }}
                 stroke={gridColor}
               />
 
@@ -153,7 +156,10 @@ export function ChargeCurve({ data, theme = 'tesla' }: ChargeCurveProps) {
                   if (name === 'soc') return [`${value.toFixed(0)}%`, '电量'];
                   return [value, name];
                 }}
-                labelFormatter={(v) => `${Math.round(Number(v) * 5)} 分钟`}
+                labelFormatter={(v) => {
+                  const date = new Date(v);
+                  return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                }}
                 contentStyle={{
                   backgroundColor: 'var(--theme-card)',
                   border: '1px solid var(--theme-card-border)',

@@ -64,7 +64,7 @@ export function DriveRoute({ positions, startLocation, endLocation, theme = 'tes
       });
       map.add(endMarker);
 
-      map.setFitView([...polylines, startMarker, endMarker]);
+      map.setFitView([...polylines, startMarker, endMarker], false, [60, 60, 60, 60]);
     },
     [positions, theme]
   );

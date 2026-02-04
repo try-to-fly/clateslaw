@@ -2,12 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import AMapLoader from '@amap/amap-jsapi-loader';
 import type { ThemeType } from '../../hooks/useTheme';
 
-const THEME_MAP_STYLES: Record<ThemeType, string> = {
-  tesla: 'amap://styles/dark',
-  cyberpunk: 'amap://styles/darkblue',
-  glass: 'amap://styles/grey',
-};
-
 interface AMapContainerProps {
   onMapReady?: (map: any, AMap: any) => void;
   className?: string;
@@ -39,7 +33,6 @@ export function AMapContainer({ onMapReady, className, theme = 'tesla' }: AMapCo
         map = new AMap.Map(containerRef.current, {
           zoom: 12,
           viewMode: '2D',
-          mapStyle: THEME_MAP_STYLES[theme],
         });
         mapRef.current = map;
 
@@ -66,13 +59,7 @@ export function AMapContainer({ onMapReady, className, theme = 'tesla' }: AMapCo
       map?.destroy();
       mapRef.current = null;
     };
-  }, [onMapReady, theme]);
-
-  useEffect(() => {
-    if (mapRef.current) {
-      mapRef.current.setMapStyle(THEME_MAP_STYLES[theme]);
-    }
-  }, [theme]);
+  }, [onMapReady]);
 
   if (error) {
     const bgClass = theme === 'cyberpunk'

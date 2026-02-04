@@ -2,7 +2,6 @@ import { useData, type DailyData } from '../hooks/useData';
 import { useTheme } from '../hooks/useTheme';
 import { DailyRouteMap } from '../components/maps/DailyRouteMap';
 import {
-  formatDistance,
   formatDuration,
   formatEnergy,
   formatTime,
@@ -87,33 +86,6 @@ export default function DailyPage() {
       {/* 轨迹地图 h-36 (144px) */}
       {allPositions && allPositions.length > 0 && (
         <DailyRouteMap allPositions={allPositions} theme={theme} />
-      )}
-
-      {/* 行程列表 - 紧凑 */}
-      {drives.length > 0 && (
-        <div className={cardClass}>
-          <div className="px-2.5 py-1 border-b border-[var(--theme-card-border)] flex items-center justify-between">
-            <span className="text-xs font-medium theme-text">🚗 行程 ({drives.length})</span>
-            <span className="text-xs theme-text-muted">
-              耗电 {formatEnergy(stats.totalEnergyUsed)}
-            </span>
-          </div>
-          <div className="divide-y divide-[var(--theme-card-border)]">
-            {drives.map((drive) => (
-              <div key={drive.id} className="px-2.5 py-1 flex items-center justify-between text-xs">
-                <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                  <span className="theme-text-muted w-10 shrink-0">{formatTime(drive.start_date)}</span>
-                  <span className="theme-text truncate">
-                    {drive.start_location}→{drive.end_location}
-                  </span>
-                </div>
-                <span className="font-medium ml-2" style={{ color: accentColor }}>
-                  {formatDistance(drive.distance)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
       )}
 
       {/* 充电列表 - 紧凑 */}

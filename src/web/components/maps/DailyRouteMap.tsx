@@ -79,7 +79,7 @@ export function DailyRouteMap({ allPositions, theme = 'tesla' }: DailyRouteMapPr
       map.add(endMarker);
       allOverlays.push(endMarker);
 
-      map.setFitView(allOverlays);
+      map.setFitView(allOverlays, false, [60, 60, 60, 60]);
     },
     [allPositions, theme]
   );
