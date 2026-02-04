@@ -17,6 +17,7 @@ import { statsCommand } from './commands/stats/index.js';
 import { detailCommand } from './commands/detail/index.js';
 import { screenshotCommand } from './commands/screenshot.js';
 import { mqttCommand } from './commands/mqtt.js';
+import { queryCommandDef } from './commands/query.js';
 
 const program = new Command();
 
@@ -143,5 +144,6 @@ program.addCommand(statsCommand);
 program.addCommand(detailCommand);
 program.addCommand(screenshotCommand);
 program.addCommand(mqttCommand);
+program.addCommand(queryCommandDef);
 
 export { program };

@@ -49,8 +49,9 @@ export class MqttService {
       this.subscribe();
     });
 
-    this.client.on('error', (err: Error & { code?: string }) => {
-      console.error('MQTT 错误:', err.message, err.code ? `(${err.code})` : '');
+    this.client.on('error', (err) => {
+      const error = err as Error & { code?: string | number };
+      console.error('MQTT 错误:', error.message, error.code ? `(${error.code})` : '');
     });
 
     this.client.on('reconnect', () => {

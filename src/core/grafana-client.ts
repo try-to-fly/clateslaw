@@ -9,25 +9,82 @@ import type {
 /**
  * 解析 Grafana 相对时间格式为 ISO 时间戳
  * 支持: now, now-Nd, now-Nh, now-Nm, now-Ns
+ * 支持边界: now/d, now/w, now/M, now/y, now-1d/d 等
  */
 export function parseGrafanaTime(timeStr: string): string {
+  const now = new Date();
+
+  // 处理纯 now
   if (timeStr === 'now') {
-    return new Date().toISOString();
+    return now.toISOString();
   }
 
-  const match = timeStr.match(/^now-(\d+)([dhms])$/);
-  if (match) {
-    const [, amount, unit] = match;
-    const ms: Record<string, number> = {
-      d: 86400000,
-      h: 3600000,
-      m: 60000,
-      s: 1000,
-    };
-    return new Date(Date.now() - parseInt(amount) * ms[unit]).toISOString();
+  // 解析时间偏移和边界
+  // 格式: now[-Nunit][/boundary]
+  const match = timeStr.match(/^now(?:-(\d+)([dhmsywM]))?(?:\/([dwMy]))?$/);
+  if (!match) {
+    return timeStr;
   }
 
-  return timeStr;
+  const [, amount, unit, boundary] = match;
+  let date = new Date(now);
+
+  // 应用时间偏移
+  if (amount && unit) {
+    const num = parseInt(amount, 10);
+    switch (unit) {
+      case 'd':
+        date.setDate(date.getDate() - num);
+        break;
+      case 'h':
+        date.setHours(date.getHours() - num);
+        break;
+      case 'm':
+        date.setMinutes(date.getMinutes() - num);
+        break;
+      case 's':
+        date.setSeconds(date.getSeconds() - num);
+        break;
+      case 'w':
+        date.setDate(date.getDate() - num * 7);
+        break;
+      case 'M':
+        date.setMonth(date.getMonth() - num);
+        break;
+      case 'y':
+        date.setFullYear(date.getFullYear() - num);
+        break;
+    }
+  }
+
+  // 应用边界对齐
+  if (boundary) {
+    switch (boundary) {
+      case 'd':
+        // 对齐到当天开始
+        date.setHours(0, 0, 0, 0);
+        break;
+      case 'w':
+        // 对齐到本周开始（周一）
+        const day = date.getDay();
+        const diff = day === 0 ? 6 : day - 1;
+        date.setDate(date.getDate() - diff);
+        date.setHours(0, 0, 0, 0);
+        break;
+      case 'M':
+        // 对齐到本月开始
+        date.setDate(1);
+        date.setHours(0, 0, 0, 0);
+        break;
+      case 'y':
+        // 对齐到本年开始
+        date.setMonth(0, 1);
+        date.setHours(0, 0, 0, 0);
+        break;
+    }
+  }
+
+  return date.toISOString();
 }
 
 /** 默认数据源配置 */
