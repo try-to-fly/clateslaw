@@ -35,6 +35,27 @@ pnpm install
 cp .env.example .env
 ```
 
+### 全局安装
+
+将 CLI 注册为全局命令 `tesla`，可在任意目录使用：
+
+```bash
+# 构建 CLI
+pnpm build:cli
+
+# 全局链接
+pnpm link --global
+
+# 验证安装
+tesla --help
+```
+
+取消全局链接：
+
+```bash
+pnpm unlink --global
+```
+
 ## 配置
 
 在 `.env` 文件中配置以下环境变量：
