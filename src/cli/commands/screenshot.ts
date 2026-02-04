@@ -5,7 +5,7 @@ import * as http from 'node:http';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import handler from 'serve-handler';
-import { getGrafanaClient, DriveService, ChargeService, StatsService, TPMSService } from '../../core/index.js';
+import { getGrafanaClient, DriveService, ChargeService, StatsService, TPMSService, getMessageService } from '../../core/index.js';
 import { getWeekRange, getMonthRange } from '../../core/utils/time.js';
 import { browserPool } from '../../core/utils/browser-pool.js';
 import { SCREENSHOT } from '../../constants.js';
@@ -291,18 +291,62 @@ async function sendAndCleanup(
   console.log(`正在发送截图到 Telegram...`);
 
   try {
-    await execAsync(
-      `openclaw message send --channel ${config.openclaw.channel} --target ${target} --message "${message}" --media "${outputPath}"`
-    );
+    const messageService = getMessageService();
+    await messageService.sendMedia(message, outputPath, { target });
     console.log('发送成功');
 
     fs.unlinkSync(outputPath);
     console.log(`已清理: ${outputPath}`);
   } catch (error) {
-    console.error('发送失败:', error instanceof Error ? error.message : error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('发送失败:', errorMsg);
     console.log(`截图保留在: ${outputPath}`);
+
+    // 发送失败通知
+    await sendFailureNotification(defaultMessage, errorMsg, options);
   }
 }
+
+/**
+ * 发送截图前的预通知
+ */
+async function sendPreNotification(
+  type: string,
+  identifier: string | number,
+  options: ScreenshotOptions
+): Promise<void> {
+  if (!options.send) return;
+
+  try {
+    const messageService = getMessageService();
+    const target = options.target || config.openclaw.target;
+    const message = `📸 正在生成${type} #${identifier} 截图...`;
+    await messageService.sendText(message, { target });
+  } catch (error) {
+    // 预通知失败不影响主流程
+    console.warn('预通知发送失败:', error instanceof Error ? error.message : error);
+  }
+}
+
+/**
+ * 发送失败通知
+ */
+async function sendFailureNotification(
+  context: string,
+  errorMsg: string,
+  options: ScreenshotOptions
+): Promise<void> {
+  try {
+    const messageService = getMessageService();
+    const target = options.target || config.openclaw.target;
+    const message = `❌ ${context}失败\n错误: ${errorMsg}`;
+    await messageService.sendText(message, { target });
+  } catch (error) {
+    // 失败通知本身失败，只记录日志
+    console.warn('失败通知发送失败:', error instanceof Error ? error.message : error);
+  }
+}
+
 
 async function getDriveData(carId: number, driveId: number): Promise<DriveData> {
   const client = getGrafanaClient();
@@ -520,6 +564,9 @@ async function screenshotDrive(
 
   const outputPath = options.output || `drive-${driveId}.png`;
 
+  // 发送预通知
+  await sendPreNotification('行程', driveId, options);
+
   const distPath = await ensureWebBuild();
 
   const server = await startServer(distPath);
@@ -535,10 +582,15 @@ async function screenshotDrive(
       scale
     );
     await sendAndCleanup(outputPath, options, `行程 #${driveId} 截图`);
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    await sendFailureNotification(`行程 #${driveId} 截图`, errorMsg, options);
+    throw error;
   } finally {
     server.close();
   }
 }
+
 
 async function screenshotCharge(
   id: string | undefined,
@@ -572,6 +624,9 @@ async function screenshotCharge(
 
   const outputPath = options.output || `charge-${chargeId}.png`;
 
+  // 发送预通知
+  await sendPreNotification('充电', chargeId, options);
+
   const distPath = await ensureWebBuild();
 
   const server = await startServer(distPath);
@@ -587,7 +642,12 @@ async function screenshotCharge(
       scale
     );
     await sendAndCleanup(outputPath, options, `充电 #${chargeId} 截图`);
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    await sendFailureNotification(`充电 #${chargeId} 截图`, errorMsg, options);
+    throw error;
   } finally {
+
     server.close();
   }
 }
@@ -614,6 +674,9 @@ async function screenshotDaily(
 
   const outputPath = options.output || `daily-${date}.png`;
 
+  // 发送预通知
+  await sendPreNotification('日报', date, options);
+
   const distPath = await ensureWebBuild();
 
   const server = await startServer(distPath);
@@ -629,10 +692,15 @@ async function screenshotDaily(
       scale
     );
     await sendAndCleanup(outputPath, options, `${date} 日报截图`);
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    await sendFailureNotification(`${date} 日报截图`, errorMsg, options);
+    throw error;
   } finally {
     server.close();
   }
 }
+
 
 async function screenshotWeekly(
   dateStr: string | undefined,
@@ -646,6 +714,9 @@ async function screenshotWeekly(
   const data = await getWeeklyData(carId, dateStr);
 
   const outputPath = options.output || `weekly-${data.period}.png`;
+
+  // 发送预通知
+  await sendPreNotification('周报', data.periodLabel, options);
 
   const distPath = await ensureWebBuild();
 
@@ -662,10 +733,15 @@ async function screenshotWeekly(
       scale
     );
     await sendAndCleanup(outputPath, options, `${data.periodLabel} 周报截图`);
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    await sendFailureNotification(`${data.periodLabel} 周报截图`, errorMsg, options);
+    throw error;
   } finally {
     server.close();
   }
 }
+
 
 async function screenshotMonthly(
   dateStr: string | undefined,
@@ -679,6 +755,9 @@ async function screenshotMonthly(
   const data = await getMonthlyData(carId, dateStr);
 
   const outputPath = options.output || `monthly-${data.period}.png`;
+
+  // 发送预通知
+  await sendPreNotification('月报', data.periodLabel, options);
 
   const distPath = await ensureWebBuild();
 
@@ -695,10 +774,15 @@ async function screenshotMonthly(
       scale
     );
     await sendAndCleanup(outputPath, options, `${data.periodLabel} 月报截图`);
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    await sendFailureNotification(`${data.periodLabel} 月报截图`, errorMsg, options);
+    throw error;
   } finally {
     server.close();
   }
 }
+
 
 async function screenshotYearly(
   yearStr: string | undefined,
@@ -711,6 +795,9 @@ async function screenshotYearly(
   const data = await getYearlyData(carId, yearStr);
 
   const outputPath = options.output || `yearly-${data.year}.png`;
+
+  // 发送预通知
+  await sendPreNotification('年报', data.periodLabel, options);
 
   const distPath = await ensureWebBuild();
 
@@ -727,10 +814,15 @@ async function screenshotYearly(
       scale
     );
     await sendAndCleanup(outputPath, options, `${data.periodLabel} 年报截图`);
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    await sendFailureNotification(`${data.periodLabel} 年报截图`, errorMsg, options);
+    throw error;
   } finally {
     server.close();
   }
 }
+
 
 /**
  * 解析查询输入（支持 JSON 字符串或文件路径）

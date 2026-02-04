@@ -13,3 +13,4 @@ export { LocationService } from './location-service.js';
 export { TimelineService } from './timeline-service.js';
 export { ProjectedRangeService } from './projected-range-service.js';
 export { TPMSService } from './tpms-service.js';
+export { MessageService, getMessageService } from './message-service.js';

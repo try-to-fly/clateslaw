@@ -1,5 +1,5 @@
 import { GrafanaClient } from './grafana-client.js';
-import { config } from '../config/index.js';
+import type { GrafanaClientConfig } from '../types/grafana.js';
 import {
   CarService,
   ChargeService,
@@ -16,19 +16,44 @@ import {
   TimelineService,
   ProjectedRangeService,
   TPMSService,
+  getMessageService,
 } from './services/index.js';
 
 let clientInstance: GrafanaClient | null = null;
+let clientConfig: GrafanaClientConfig | null = null;
+
+/**
+ * 配置 GrafanaClient（用于插件模式）
+ */
+export function configureGrafanaClient(cfg: GrafanaClientConfig): void {
+  clientConfig = cfg;
+  clientInstance = null; // 重置实例以使用新配置
+}
+
+/**
+ * 从环境变量加载配置
+ */
+function loadEnvConfig(): GrafanaClientConfig {
+  const url = process.env.GRAFANA_URL;
+  const token = process.env.GRAFANA_TOKEN;
+  if (!url || !token) {
+    throw new Error('Missing required environment variables: GRAFANA_URL and GRAFANA_TOKEN');
+  }
+  return { baseUrl: url, token };
+}
 
 /**
  * 获取 GrafanaClient 单例
  */
 export function getGrafanaClient(): GrafanaClient {
   if (!clientInstance) {
-    clientInstance = new GrafanaClient({
-      baseUrl: config.grafana.url,
-      token: config.grafana.token,
-    });
+    if (clientConfig) {
+      // 使用外部配置（插件模式）
+      clientInstance = new GrafanaClient(clientConfig);
+    } else {
+      // 使用环境变量配置（CLI 模式）
+      clientInstance = new GrafanaClient(loadEnvConfig());
+    }
   }
   return clientInstance;
 }
@@ -109,6 +134,9 @@ export function createProjectedRangeService(): ProjectedRangeService {
 export function createTPMSService(): TPMSService {
   return new TPMSService(getGrafanaClient());
 }
+
+/** 获取消息服务单例 */
+export { getMessageService };
 
 export { GrafanaClient, GrafanaApiError, GrafanaQueryError } from './grafana-client.js';
 export * from './services/index.js';
