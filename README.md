@@ -20,6 +20,101 @@ AI (OpenClaw Skill) 解析自然语言
 
 **Skill 文档**: [`skills/tesla/SKILL.md`](./skills/tesla/SKILL.md)
 
+## OpenClaw 插件
+
+本项目可以作为 OpenClaw 插件使用，提供 AI Tool 和斜杠命令。
+
+### 安装插件
+
+在 OpenClaw 配置文件中添加插件：
+
+```json
+{
+  "plugins": [
+    {
+      "path": "/path/to/clateslaw",
+      "config": {
+        "grafanaUrl": "https://grafana.example.com",
+        "grafanaToken": "your-grafana-api-token",
+        "defaultCarId": 1
+      }
+    }
+  ]
+}
+```
+
+### 配置说明
+
+| 配置项 | 必填 | 说明 |
+|--------|------|------|
+| `grafanaUrl` | 是 | Grafana 服务器 URL |
+| `grafanaToken` | 是 | Grafana API Token |
+| `defaultCarId` | 否 | 默认车辆 ID，默认为 1 |
+
+### 使用方式
+
+#### 斜杠命令
+
+```
+/tesla                    # 显示帮助
+/tesla drives             # 查询行程记录
+/tesla charges            # 查询充电记录
+/tesla battery            # 查询电池健康
+/tesla 充电记录            # 支持中文关键词
+/tesla {"version":"1.0","type":"drives","timeRange":{"semantic":"last_7_days"}}
+```
+
+支持的关键词：
+
+| 英文 | 中文 | 查询类型 |
+|------|------|----------|
+| cars | 车辆 | 车辆列表 |
+| car | 概览 | 车辆概览 |
+| drives | 行程 | 行程记录 |
+| charges | 充电 | 充电记录 |
+| battery | 电池 | 电池健康 |
+| efficiency | 能耗/效率 | 能耗效率 |
+| states | 状态 | 状态历史 |
+| updates | 更新 | 更新历史 |
+| mileage | 里程 | 里程统计 |
+| vampire | 静置/耗电 | 静置耗电 |
+| locations | 位置 | 位置统计 |
+| timeline | 时间线 | 时间线 |
+| tpms | 胎压 | 胎压数据 |
+
+#### AI Tool
+
+AI 可以调用 `tesla_query` 工具执行结构化查询：
+
+```json
+{
+  "query": "{\"version\":\"1.0\",\"type\":\"drives\",\"timeRange\":{\"semantic\":\"last_7_days\"}}"
+}
+```
+
+支持的查询类型：
+- `cars` - 车辆列表
+- `car` - 车辆概览
+- `drives` - 行程记录
+- `charges` - 充电记录
+- `battery` - 电池健康
+- `efficiency` - 能耗效率
+- `states` - 状态历史
+- `updates` - 更新历史
+- `mileage` - 里程统计
+- `vampire` - 静置耗电
+- `locations` - 位置统计
+- `locations.charging` - 充电站统计
+- `timeline` - 时间线
+- `visited` - 访问地点
+- `projected-range` - 预估续航
+- `stats.charging` - 充电统计
+- `stats.driving` - 驾驶统计
+- `stats.period` - 周期统计
+- `tpms` - 胎压数据
+- `detail.drive` - 行程详情（需要 recordId）
+- `detail.charge` - 充电详情（需要 recordId）
+
 ## 功能特性
 
 - 🚗 车辆信息查询

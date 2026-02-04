@@ -1,0 +1,38 @@
+{
+  "id": "tesla",
+  "name": "Tesla Data",
+  "description": "Tesla 车辆数据查询与可视化 (via TeslaMate/Grafana)",
+  "configSchema": {
+    "type": "object",
+    "required": ["grafanaUrl", "grafanaToken"],
+    "properties": {
+      "grafanaUrl": {
+        "type": "string",
+        "description": "Grafana 服务器 URL"
+      },
+      "grafanaToken": {
+        "type": "string",
+        "description": "Grafana API Token"
+      },
+      "defaultCarId": {
+        "type": "integer",
+        "default": 1,
+        "description": "默认车辆 ID"
+      }
+    }
+  },
+  "uiHints": {
+    "grafanaUrl": {
+      "label": "Grafana URL",
+      "placeholder": "https://grafana.example.com"
+    },
+    "grafanaToken": {
+      "label": "Grafana Token",
+      "sensitive": true
+    },
+    "defaultCarId": {
+      "label": "默认车辆 ID",
+      "placeholder": "1"
+    }
+  }
+}
