@@ -53,3 +53,30 @@ export interface PeriodStatsQueryParams {
   to?: string;
   period?: 'day' | 'week' | 'month' | 'year';
 }
+
+/** 周报/月报聚合统计数据 */
+export interface AggregatedStats {
+  period: string;
+  periodLabel: string;
+  totalDistance: number;
+  totalDuration: number;
+  totalDrives: number;
+  totalCharges: number;
+  totalEnergyUsed: number;
+  totalEnergyAdded: number;
+  totalCost: number;
+  avgEfficiency: number;
+  comparison?: {
+    distanceChange: number;
+    distanceChangePercent: number;
+    energyChange: number;
+    energyChangePercent: number;
+  };
+}
+
+/** 周报/月报查询参数 */
+export interface AggregatedStatsQueryParams {
+  carId: number;
+  date?: string;
+  includePrevious?: boolean;
+}

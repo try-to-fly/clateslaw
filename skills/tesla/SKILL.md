@@ -1,3 +1,18 @@
+---
+name: tesla
+description: Tesla 车辆数据查询与可视化，支持行程、充电、电池、效率等数据查询和截图生成
+homepage: https://github.com/nicekate/clateslaw
+metadata:
+  openclaw:
+    emoji: "🚗"
+    requires:
+      bins:
+        - tesla
+      env:
+        - GRAFANA_URL
+        - GRAFANA_TOKEN
+---
+
 # Tesla 自然语言查询 Skill
 
 ## 概述
@@ -24,6 +39,10 @@
 | "最近的充电" / "上一次充电" | `charges` | 需要截图，limit: 1 |
 | "今天汇总" / "日报" / "今天的日报" | `screenshot` | screenshot.type: daily |
 | "昨天的日报" | `screenshot` | screenshot.type: daily, date: 昨天日期 |
+| "本周汇总" / "周报" | `screenshot` | screenshot.type: weekly |
+| "上周周报" | `screenshot` | screenshot.type: weekly, date: 上周某天日期 |
+| "本月汇总" / "月报" | `screenshot` | screenshot.type: monthly |
+| "上月月报" | `screenshot` | screenshot.type: monthly, date: 上月某天日期 |
 | "行程 123 详情" / "查看行程 123" | `detail.drive` | recordId: 123 |
 | "充电 456 详情" / "查看充电 456" | `detail.charge` | recordId: 456 |
 
@@ -33,11 +52,14 @@
 |-------------|------|------|
 | "这周开了多少公里" | `stats.driving` | timeRange: this_week |
 | "本月充电统计" | `stats.charging` | timeRange: this_month |
-| "电池状态" / "电池健康" | `battery` | 返回电池健康数据 |
+| "电池状态" / "电池健康" / "电池衰减" / "电池寿命" | `battery` | 返回电池健康数据 |
 | "最近的行程列表" | `drives` | 返回行程列表，不截图 |
 | "效率报告" | `efficiency` | 返回效率数据 |
-| "里程统计" | `mileage` | 返回里程数据 |
+| "开了多远" / "总里程" / "里程统计" | `mileage` | 返回里程数据 |
 | "车辆信息" | `car` | 返回车辆概览 |
+| "待机耗电" / "吸血鬼" / "停车耗电" | `vampire` | 返回待机能耗数据 |
+| "去过哪里" / "常去地点" / "位置统计" | `locations` | 返回位置统计数据 |
+| "软件版本" / "更新记录" / "固件版本" | `updates` | 返回固件更新历史 |
 
 ## 时间映射表
 
@@ -72,7 +94,7 @@ interface TeslaQuery {
     limit?: number;         // 返回数量限制
   };
   screenshot?: {
-    type: 'drive' | 'charge' | 'daily';
+    type: 'drive' | 'charge' | 'daily' | 'weekly' | 'monthly';
     id?: number;            // 截图的记录 ID
     date?: string;          // 日期 (YYYY-MM-DD)
   };
@@ -202,18 +224,81 @@ tesla query '{"version":"1.0","type":"stats.driving","carId":1,"timeRange":{"sem
 tesla screenshot query '{"version":"1.0","type":"charges","carId":1,"pagination":{"limit":1}}' --send
 ```
 
+### 示例 7：本周周报（需要截图）
+
+**用户**: "发一下本周的周报"
+
+**生成的 JSON**:
+```json
+{
+  "version": "1.0",
+  "type": "screenshot",
+  "carId": 1,
+  "screenshot": {
+    "type": "weekly"
+  }
+}
+```
+
+**执行命令**:
+```bash
+tesla screenshot query '{"version":"1.0","type":"screenshot","carId":1,"screenshot":{"type":"weekly"}}' --send
+```
+
+### 示例 8：本月月报（需要截图）
+
+**用户**: "看看这个月的汇总"
+
+**生成的 JSON**:
+```json
+{
+  "version": "1.0",
+  "type": "screenshot",
+  "carId": 1,
+  "screenshot": {
+    "type": "monthly"
+  }
+}
+```
+
+**执行命令**:
+```bash
+tesla screenshot query '{"version":"1.0","type":"screenshot","carId":1,"screenshot":{"type":"monthly"}}' --send
+```
+
+### 示例 9：待机耗电查询
+
+**用户**: "最近吸血鬼损耗多少"
+
+**生成的 JSON**:
+```json
+{
+  "version": "1.0",
+  "type": "vampire",
+  "carId": 1,
+  "timeRange": {
+    "semantic": "last_7_days"
+  }
+}
+```
+
+**执行命令**:
+```bash
+tesla query '{"version":"1.0","type":"vampire","carId":1,"timeRange":{"semantic":"last_7_days"}}'
+```
+
 ## 判断是否需要截图
 
 以下情况需要生成截图（使用 `tesla screenshot query`）：
 
 1. 用户明确要求"看看"、"发送"、"截图"
 2. 查询类型是 `drives`、`charges`、`detail.drive`、`detail.charge`、`screenshot`
-3. 用户请求"日报"、"汇总"
+3. 用户请求"日报"、"周报"、"月报"、"汇总"
 
 以下情况仅返回数据（使用 `tesla query`）：
 
 1. 用户询问统计数据，如"开了多少公里"、"充了多少电"
-2. 查询类型是 `battery`、`efficiency`、`mileage`、`stats.*`
+2. 查询类型是 `battery`、`efficiency`、`mileage`、`vampire`、`locations`、`updates`、`stats.*`
 3. 用户明确要求"列表"而非查看详情
 
 ## 默认行为
@@ -226,3 +311,22 @@ tesla screenshot query '{"version":"1.0","type":"charges","carId":1,"pagination"
 ## 协议参考
 
 详细的 TeslaQuery 协议定义请参考：[query-protocol.md](./references/query-protocol.md)
+
+## 错误处理
+
+当命令执行失败时，请根据以下错误信息进行处理：
+
+| 错误信息 | 处理方式 |
+|---------|---------|
+| "No data found" / "No drives found" / "No charges found" | 告知用户该时间段无相关记录，建议扩大时间范围或检查日期 |
+| "Connection failed" / "ECONNREFUSED" | 建议用户检查 TeslaMate 服务是否正常运行 |
+| "Drive/Charge {id} not found" | 告知用户指定的记录 ID 不存在，建议查询最近记录列表 |
+| 截图生成失败 | 尝试使用 `tesla query` 返回纯数据结果作为备选 |
+| "Invalid JSON" | 检查生成的 JSON 格式是否正确 |
+| "Invalid query protocol" | 确保 version 为 "1.0" 且 type 字段有效 |
+
+### 常见问题排查
+
+1. **无数据返回**: 检查时间范围是否合理，TeslaMate 是否正常记录数据
+2. **截图空白**: 确认 Web 服务打包成功，检查浏览器是否正常启动
+3. **发送失败**: 检查 OpenClaw 配置和 Telegram 连接状态

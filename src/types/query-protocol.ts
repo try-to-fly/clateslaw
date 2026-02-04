@@ -77,7 +77,7 @@ export interface PaginationConfig {
 
 /** 截图配置 */
 export interface ScreenshotConfig {
-  type: 'drive' | 'charge' | 'daily';
+  type: 'drive' | 'charge' | 'daily' | 'weekly' | 'monthly';
   id?: number;
   date?: string;
   send?: boolean;

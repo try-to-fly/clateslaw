@@ -6,7 +6,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import puppeteer from 'puppeteer';
 import handler from 'serve-handler';
-import { getGrafanaClient, DriveService, ChargeService } from '../../core/index.js';
+import { getGrafanaClient, DriveService, ChargeService, StatsService } from '../../core/index.js';
 import { config } from '../../config/index.js';
 import type { DriveRecord, DrivePosition } from '../../types/drive.js';
 import type { ChargeRecord, ChargeCurvePoint } from '../../types/charge.js';
@@ -44,6 +44,54 @@ interface DailyData {
     totalDuration: number;
     totalEnergyUsed: number;
     totalEnergyAdded: number;
+  };
+}
+
+interface WeeklyData {
+  period: string;
+  periodLabel: string;
+  drives: DriveRecord[];
+  charges: ChargeRecord[];
+  allPositions: DrivePosition[][];
+  stats: {
+    totalDistance: number;
+    totalDuration: number;
+    totalDrives: number;
+    totalCharges: number;
+    totalEnergyUsed: number;
+    totalEnergyAdded: number;
+    totalCost: number;
+    avgEfficiency: number;
+  };
+  comparison?: {
+    distanceChange: number;
+    distanceChangePercent: number;
+    energyChange: number;
+    energyChangePercent: number;
+  };
+}
+
+interface MonthlyData {
+  period: string;
+  periodLabel: string;
+  drives: DriveRecord[];
+  charges: ChargeRecord[];
+  allPositions: DrivePosition[][];
+  stats: {
+    totalDistance: number;
+    totalDuration: number;
+    totalDrives: number;
+    totalCharges: number;
+    totalEnergyUsed: number;
+    totalEnergyAdded: number;
+    totalCost: number;
+    avgEfficiency: number;
+  };
+  comparison?: {
+    distanceChange: number;
+    distanceChangePercent: number;
+    energyChange: number;
+    energyChangePercent: number;
   };
 }
 
@@ -104,6 +152,8 @@ async function startServer(distPath: string): Promise<http.Server> {
         { source: '/drive', destination: '/index.html' },
         { source: '/charge', destination: '/index.html' },
         { source: '/daily', destination: '/index.html' },
+        { source: '/weekly', destination: '/index.html' },
+        { source: '/monthly', destination: '/index.html' },
       ],
     });
   });
@@ -125,7 +175,7 @@ function getServerPort(server: http.Server): number {
 
 async function takeScreenshot(
   url: string,
-  data: DriveData | ChargeData | DailyData,
+  data: DriveData | ChargeData | DailyData | WeeklyData | MonthlyData,
   outputPath: string,
   width: number,
   scale: number
@@ -296,6 +346,142 @@ async function getDailyData(carId: number, dateStr: string): Promise<DailyData> 
   return { date: dateStr, drives, charges, allPositions, stats };
 }
 
+/**
+ * 获取指定日期所在周的起止日期（周一到周日）
+ */
+function getWeekRange(dateStr?: string): { from: string; to: string; label: string } {
+  const date = dateStr ? new Date(dateStr) : new Date();
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + diff);
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  const weekNum = getWeekNumber(monday);
+  const label = `${monday.getFullYear()}年第${weekNum}周`;
+
+  return {
+    from: monday.toISOString(),
+    to: sunday.toISOString(),
+    label,
+  };
+}
+
+/**
+ * 获取指定日期所在月的起止日期
+ */
+function getMonthRange(dateStr?: string): { from: string; to: string; label: string } {
+  const date = dateStr ? new Date(dateStr) : new Date();
+
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+  firstDay.setHours(0, 0, 0, 0);
+
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  lastDay.setHours(23, 59, 59, 999);
+
+  const label = `${date.getFullYear()}年${date.getMonth() + 1}月`;
+
+  return {
+    from: firstDay.toISOString(),
+    to: lastDay.toISOString(),
+    label,
+  };
+}
+
+/**
+ * 获取ISO周数
+ */
+function getWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+async function getWeeklyData(carId: number, dateStr?: string): Promise<WeeklyData> {
+  const client = getGrafanaClient();
+  const driveService = new DriveService(client);
+  const chargeService = new ChargeService(client);
+  const statsService = new StatsService(client);
+
+  const currentRange = getWeekRange(dateStr);
+  const { from, to, label } = currentRange;
+
+  const [drives, charges, aggregatedStats] = await Promise.all([
+    driveService.getDrives(carId, { from, to, limit: 100 }),
+    chargeService.getCharges(carId, { from, to, limit: 100 }),
+    statsService.getWeeklyStats({ carId, date: dateStr, includePrevious: true }),
+  ]);
+
+  const allPositions = await Promise.all(
+    drives.map((drive) => driveService.getDrivePositions(carId, drive.id))
+  );
+
+  return {
+    period: from.split('T')[0],
+    periodLabel: label,
+    drives,
+    charges,
+    allPositions,
+    stats: {
+      totalDistance: aggregatedStats.totalDistance,
+      totalDuration: aggregatedStats.totalDuration,
+      totalDrives: aggregatedStats.totalDrives,
+      totalCharges: aggregatedStats.totalCharges,
+      totalEnergyUsed: aggregatedStats.totalEnergyUsed,
+      totalEnergyAdded: aggregatedStats.totalEnergyAdded,
+      totalCost: aggregatedStats.totalCost,
+      avgEfficiency: aggregatedStats.avgEfficiency,
+    },
+    comparison: aggregatedStats.comparison,
+  };
+}
+
+async function getMonthlyData(carId: number, dateStr?: string): Promise<MonthlyData> {
+  const client = getGrafanaClient();
+  const driveService = new DriveService(client);
+  const chargeService = new ChargeService(client);
+  const statsService = new StatsService(client);
+
+  const currentRange = getMonthRange(dateStr);
+  const { from, to, label } = currentRange;
+
+  const [drives, charges, aggregatedStats] = await Promise.all([
+    driveService.getDrives(carId, { from, to, limit: 200 }),
+    chargeService.getCharges(carId, { from, to, limit: 200 }),
+    statsService.getMonthlyStats({ carId, date: dateStr, includePrevious: true }),
+  ]);
+
+  const allPositions = await Promise.all(
+    drives.map((drive) => driveService.getDrivePositions(carId, drive.id))
+  );
+
+  return {
+    period: from.split('T')[0],
+    periodLabel: label,
+    drives,
+    charges,
+    allPositions,
+    stats: {
+      totalDistance: aggregatedStats.totalDistance,
+      totalDuration: aggregatedStats.totalDuration,
+      totalDrives: aggregatedStats.totalDrives,
+      totalCharges: aggregatedStats.totalCharges,
+      totalEnergyUsed: aggregatedStats.totalEnergyUsed,
+      totalEnergyAdded: aggregatedStats.totalEnergyAdded,
+      totalCost: aggregatedStats.totalCost,
+      avgEfficiency: aggregatedStats.avgEfficiency,
+    },
+    comparison: aggregatedStats.comparison,
+  };
+}
+
 async function screenshotDrive(
   id: string | undefined,
   options: ScreenshotOptions
@@ -442,6 +628,72 @@ async function screenshotDaily(
   }
 }
 
+async function screenshotWeekly(
+  dateStr: string | undefined,
+  options: ScreenshotOptions
+): Promise<void> {
+  const width = parseInt(options.width || String(DEFAULT_WIDTH), 10);
+  const scale = parseInt(options.scale || String(DEFAULT_SCALE), 10);
+  const carId = parseInt(options.carId || '1', 10);
+
+  console.log('正在获取周报数据...');
+  const data = await getWeeklyData(carId, dateStr);
+
+  const outputPath = options.output || `weekly-${data.period}.png`;
+
+  const distPath = await ensureWebBuild();
+
+  const server = await startServer(distPath);
+  const port = getServerPort(server);
+
+  try {
+    const theme = options.theme || 'tesla';
+    await takeScreenshot(
+      `http://localhost:${port}/weekly?theme=${theme}`,
+      data,
+      outputPath,
+      width,
+      scale
+    );
+    await sendAndCleanup(outputPath, options, `${data.periodLabel} 周报截图`);
+  } finally {
+    server.close();
+  }
+}
+
+async function screenshotMonthly(
+  dateStr: string | undefined,
+  options: ScreenshotOptions
+): Promise<void> {
+  const width = parseInt(options.width || String(DEFAULT_WIDTH), 10);
+  const scale = parseInt(options.scale || String(DEFAULT_SCALE), 10);
+  const carId = parseInt(options.carId || '1', 10);
+
+  console.log('正在获取月报数据...');
+  const data = await getMonthlyData(carId, dateStr);
+
+  const outputPath = options.output || `monthly-${data.period}.png`;
+
+  const distPath = await ensureWebBuild();
+
+  const server = await startServer(distPath);
+  const port = getServerPort(server);
+
+  try {
+    const theme = options.theme || 'tesla';
+    await takeScreenshot(
+      `http://localhost:${port}/monthly?theme=${theme}`,
+      data,
+      outputPath,
+      width,
+      scale
+    );
+    await sendAndCleanup(outputPath, options, `${data.periodLabel} 月报截图`);
+  } finally {
+    server.close();
+  }
+}
+
 /**
  * 解析查询输入（支持 JSON 字符串或文件路径）
  */
@@ -467,7 +719,7 @@ function validateQuery(query: unknown): query is TeslaQuery {
   return true;
 }
 
-type PageType = 'drive' | 'charge' | 'daily';
+type PageType = 'drive' | 'charge' | 'daily' | 'weekly' | 'monthly';
 
 /**
  * 根据查询类型确定页面类型
@@ -500,7 +752,7 @@ async function fetchDataForScreenshot(
   query: TeslaQuery,
   pageType: PageType,
   carId: number
-): Promise<DriveData | ChargeData | DailyData> {
+): Promise<DriveData | ChargeData | DailyData | WeeklyData | MonthlyData> {
   switch (pageType) {
     case 'drive': {
       // 如果有明确的 recordId
@@ -556,6 +808,16 @@ async function fetchDataForScreenshot(
       const date = query.screenshot?.date || new Date().toISOString().split('T')[0];
       return getDailyData(carId, date);
     }
+
+    case 'weekly': {
+      const date = query.screenshot?.date;
+      return getWeeklyData(carId, date);
+    }
+
+    case 'monthly': {
+      const date = query.screenshot?.date;
+      return getMonthlyData(carId, date);
+    }
   }
 }
 
@@ -565,7 +827,7 @@ async function fetchDataForScreenshot(
 function generateOutputPath(
   query: TeslaQuery,
   pageType: PageType,
-  data: DriveData | ChargeData | DailyData
+  data: DriveData | ChargeData | DailyData | WeeklyData | MonthlyData
 ): string {
   const timestamp = Date.now();
   switch (pageType) {
@@ -575,6 +837,10 @@ function generateOutputPath(
       return `charge-${(data as ChargeData).charge.id}-${timestamp}.png`;
     case 'daily':
       return `daily-${(data as DailyData).date}-${timestamp}.png`;
+    case 'weekly':
+      return `weekly-${(data as WeeklyData).period}-${timestamp}.png`;
+    case 'monthly':
+      return `monthly-${(data as MonthlyData).period}-${timestamp}.png`;
   }
 }
 
@@ -584,7 +850,7 @@ function generateOutputPath(
 function generateMessage(
   query: TeslaQuery,
   pageType: PageType,
-  data: DriveData | ChargeData | DailyData
+  data: DriveData | ChargeData | DailyData | WeeklyData | MonthlyData
 ): string {
   switch (pageType) {
     case 'drive':
@@ -593,6 +859,10 @@ function generateMessage(
       return `充电 #${(data as ChargeData).charge.id} 截图`;
     case 'daily':
       return `${(data as DailyData).date} 日报截图`;
+    case 'weekly':
+      return `${(data as WeeklyData).periodLabel} 周报截图`;
+    case 'monthly':
+      return `${(data as MonthlyData).periodLabel} 月报截图`;
   }
 }
 
@@ -705,6 +975,34 @@ export const screenshotCommand = new Command('screenshot')
       .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
       .option('--mock', '使用 Mock 数据（无需连接 Grafana）')
       .action(screenshotDaily)
+  )
+  .addCommand(
+    new Command('weekly')
+      .description('Screenshot weekly overview')
+      .argument('[date]', 'Date within the week (YYYY-MM-DD, defaults to current week)')
+      .option('-o, --output <path>', 'Output file path')
+      .option('-w, --width <number>', 'Viewport width', String(DEFAULT_WIDTH))
+      .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
+      .option('-c, --car-id <number>', 'Car ID', '1')
+      .option('-s, --send', '发送到 Telegram 后删除文件')
+      .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
+      .option('-m, --message <text>', '自定义消息')
+      .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
+      .action(screenshotWeekly)
+  )
+  .addCommand(
+    new Command('monthly')
+      .description('Screenshot monthly overview')
+      .argument('[date]', 'Date within the month (YYYY-MM-DD, defaults to current month)')
+      .option('-o, --output <path>', 'Output file path')
+      .option('-w, --width <number>', 'Viewport width', String(DEFAULT_WIDTH))
+      .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
+      .option('-c, --car-id <number>', 'Car ID', '1')
+      .option('-s, --send', '发送到 Telegram 后删除文件')
+      .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
+      .option('-m, --message <text>', '自定义消息')
+      .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
+      .action(screenshotMonthly)
   )
   .addCommand(
     new Command('query')

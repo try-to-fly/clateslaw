@@ -37,7 +37,55 @@ export interface DailyData {
   };
 }
 
-export type TeslaData = DriveData | ChargeData | DailyData | HomeData;
+export interface WeeklyData {
+  period: string;
+  periodLabel: string;
+  drives: DriveRecord[];
+  charges: ChargeRecord[];
+  allPositions: DrivePosition[][];
+  stats: {
+    totalDistance: number;
+    totalDuration: number;
+    totalDrives: number;
+    totalCharges: number;
+    totalEnergyUsed: number;
+    totalEnergyAdded: number;
+    totalCost: number;
+    avgEfficiency: number;
+  };
+  comparison?: {
+    distanceChange: number;
+    distanceChangePercent: number;
+    energyChange: number;
+    energyChangePercent: number;
+  };
+}
+
+export interface MonthlyData {
+  period: string;
+  periodLabel: string;
+  drives: DriveRecord[];
+  charges: ChargeRecord[];
+  allPositions: DrivePosition[][];
+  stats: {
+    totalDistance: number;
+    totalDuration: number;
+    totalDrives: number;
+    totalCharges: number;
+    totalEnergyUsed: number;
+    totalEnergyAdded: number;
+    totalCost: number;
+    avgEfficiency: number;
+  };
+  comparison?: {
+    distanceChange: number;
+    distanceChangePercent: number;
+    energyChange: number;
+    energyChangePercent: number;
+  };
+}
+
+export type TeslaData = DriveData | ChargeData | DailyData | HomeData | WeeklyData | MonthlyData;
 
 function getDemoData(): TeslaData | null {
   if (!import.meta.env.DEV) {

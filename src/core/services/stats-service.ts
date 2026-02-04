@@ -5,10 +5,70 @@ import type {
   DrivingStatsQueryParams,
   PeriodStats,
   PeriodStatsQueryParams,
+  AggregatedStats,
+  AggregatedStatsQueryParams,
 } from '../../types/stats.js';
 import type { GrafanaClient } from '../grafana-client.js';
 import { CHARGING_STATS_QUERIES } from '../queries/charging-stats.js';
 import { DRIVING_STATS_QUERIES } from '../queries/driving-stats.js';
+
+/**
+ * 获取指定日期所在周的起止日期（周一到周日）
+ */
+function getWeekRange(dateStr?: string): { from: string; to: string; label: string } {
+  const date = dateStr ? new Date(dateStr) : new Date();
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + diff);
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  const weekNum = getWeekNumber(monday);
+  const label = `${monday.getFullYear()}年第${weekNum}周`;
+
+  return {
+    from: monday.toISOString(),
+    to: sunday.toISOString(),
+    label,
+  };
+}
+
+/**
+ * 获取指定日期所在月的起止日期
+ */
+function getMonthRange(dateStr?: string): { from: string; to: string; label: string } {
+  const date = dateStr ? new Date(dateStr) : new Date();
+
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+  firstDay.setHours(0, 0, 0, 0);
+
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  lastDay.setHours(23, 59, 59, 999);
+
+  const label = `${date.getFullYear()}年${date.getMonth() + 1}月`;
+
+  return {
+    from: firstDay.toISOString(),
+    to: lastDay.toISOString(),
+    label,
+  };
+}
+
+/**
+ * 获取ISO周数
+ */
+function getWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
 
 export class StatsService {
   constructor(private readonly client: GrafanaClient) {}
@@ -152,5 +212,113 @@ export class StatsService {
       variables: { car_id: carId },
       timeRange: { from, to },
     });
+  }
+
+  async getWeeklyStats(params: AggregatedStatsQueryParams): Promise<AggregatedStats> {
+    const { carId, date, includePrevious = true } = params;
+
+    const currentRange = getWeekRange(date);
+    const [drivingStats, chargingStats] = await Promise.all([
+      this.getDrivingStats({ carId, from: currentRange.from, to: currentRange.to }),
+      this.getChargingStats({ carId, from: currentRange.from, to: currentRange.to }),
+    ]);
+
+    const avgEfficiency = drivingStats.total_distance > 0
+      ? (drivingStats.total_energy_consumed / drivingStats.total_distance) * 1000
+      : 0;
+
+    const result: AggregatedStats = {
+      period: currentRange.from.split('T')[0],
+      periodLabel: currentRange.label,
+      totalDistance: drivingStats.total_distance,
+      totalDuration: drivingStats.total_duration_min,
+      totalDrives: drivingStats.total_drives,
+      totalCharges: chargingStats.total_charges,
+      totalEnergyUsed: drivingStats.total_energy_consumed,
+      totalEnergyAdded: chargingStats.total_energy_added,
+      totalCost: chargingStats.total_cost,
+      avgEfficiency,
+    };
+
+    if (includePrevious) {
+      const prevDate = new Date(currentRange.from);
+      prevDate.setDate(prevDate.getDate() - 7);
+      const prevRange = getWeekRange(prevDate.toISOString());
+
+      const [prevDriving, prevCharging] = await Promise.all([
+        this.getDrivingStats({ carId, from: prevRange.from, to: prevRange.to }),
+        this.getChargingStats({ carId, from: prevRange.from, to: prevRange.to }),
+      ]);
+
+      const distanceChange = result.totalDistance - prevDriving.total_distance;
+      const energyChange = result.totalEnergyUsed - prevDriving.total_energy_consumed;
+
+      result.comparison = {
+        distanceChange,
+        distanceChangePercent: prevDriving.total_distance > 0
+          ? (distanceChange / prevDriving.total_distance) * 100
+          : 0,
+        energyChange,
+        energyChangePercent: prevDriving.total_energy_consumed > 0
+          ? (energyChange / prevDriving.total_energy_consumed) * 100
+          : 0,
+      };
+    }
+
+    return result;
+  }
+
+  async getMonthlyStats(params: AggregatedStatsQueryParams): Promise<AggregatedStats> {
+    const { carId, date, includePrevious = true } = params;
+
+    const currentRange = getMonthRange(date);
+    const [drivingStats, chargingStats] = await Promise.all([
+      this.getDrivingStats({ carId, from: currentRange.from, to: currentRange.to }),
+      this.getChargingStats({ carId, from: currentRange.from, to: currentRange.to }),
+    ]);
+
+    const avgEfficiency = drivingStats.total_distance > 0
+      ? (drivingStats.total_energy_consumed / drivingStats.total_distance) * 1000
+      : 0;
+
+    const result: AggregatedStats = {
+      period: currentRange.from.split('T')[0],
+      periodLabel: currentRange.label,
+      totalDistance: drivingStats.total_distance,
+      totalDuration: drivingStats.total_duration_min,
+      totalDrives: drivingStats.total_drives,
+      totalCharges: chargingStats.total_charges,
+      totalEnergyUsed: drivingStats.total_energy_consumed,
+      totalEnergyAdded: chargingStats.total_energy_added,
+      totalCost: chargingStats.total_cost,
+      avgEfficiency,
+    };
+
+    if (includePrevious) {
+      const prevDate = new Date(currentRange.from);
+      prevDate.setMonth(prevDate.getMonth() - 1);
+      const prevRange = getMonthRange(prevDate.toISOString());
+
+      const [prevDriving, prevCharging] = await Promise.all([
+        this.getDrivingStats({ carId, from: prevRange.from, to: prevRange.to }),
+        this.getChargingStats({ carId, from: prevRange.from, to: prevRange.to }),
+      ]);
+
+      const distanceChange = result.totalDistance - prevDriving.total_distance;
+      const energyChange = result.totalEnergyUsed - prevDriving.total_energy_consumed;
+
+      result.comparison = {
+        distanceChange,
+        distanceChangePercent: prevDriving.total_distance > 0
+          ? (distanceChange / prevDriving.total_distance) * 100
+          : 0,
+        energyChange,
+        energyChangePercent: prevDriving.total_energy_consumed > 0
+          ? (energyChange / prevDriving.total_energy_consumed) * 100
+          : 0,
+      };
+    }
+
+    return result;
   }
 }
