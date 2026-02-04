@@ -10,10 +10,6 @@ export interface DriveRecord {
   outside_temp_avg: number;
   start_location: string;
   end_location: string;
-  /** 爬升高度（米） */
-  ascent: number | null;
-  /** 下降高度（米） */
-  descent: number | null;
 }
 
 /** 行程查询参数 */

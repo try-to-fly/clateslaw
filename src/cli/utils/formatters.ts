@@ -71,7 +71,7 @@ export function formatChargesTable(charges: ChargeRecord[]): void {
 
 export function formatDrivesTable(drives: DriveRecord[]): void {
   const table = new Table({
-    head: ['ID', 'Start', 'Route', 'Distance', 'Duration', 'Max Speed', 'Elevation'],
+    head: ['ID', 'Start', 'Route', 'Distance', 'Duration', 'Max Speed'],
     style: { head: ['cyan'] },
   });
 
@@ -81,11 +81,8 @@ export function formatDrivesTable(drives: DriveRecord[]): void {
     const distance = `${d.distance.toFixed(1)} km`;
     const duration = `${d.duration_min} min`;
     const speed = `${d.speed_max} km/h`;
-    const elevation = d.ascent !== null && d.descent !== null
-      ? `↑${d.ascent}m ↓${d.descent}m`
-      : '-';
 
-    table.push([d.id, start, route, distance, duration, speed, elevation]);
+    table.push([d.id, start, route, distance, duration, speed]);
   }
 
   console.log(table.toString());

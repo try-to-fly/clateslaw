@@ -143,8 +143,6 @@ export function getMockDriveData(): MockDriveData {
       outside_temp_avg: 7.2,
       start_location: '北京市朝阳区',
       end_location: '北京市海淀区',
-      ascent: 45,
-      descent: 32,
     },
     positions: generateMockPositions(),
   };
@@ -202,8 +200,6 @@ function generateMockDrives(): DriveRecord[] {
       outside_temp_avg: Math.round((5 + Math.random() * 10) * 10) / 10,
       start_location: locationPair.start,
       end_location: locationPair.end,
-      ascent: Math.round(20 + Math.random() * 60),
-      descent: Math.round(15 + Math.random() * 50),
     });
   }
 

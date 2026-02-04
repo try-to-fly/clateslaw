@@ -1,5 +1,5 @@
 import type { TPMSRecord, TPMSStats, TPMSQueryParams } from '../../types/tpms.js';
-import type { GrafanaClient } from '../grafana-client.js';
+import { parseGrafanaTime, type GrafanaClient } from '../grafana-client.js';
 import { TPMS_QUERIES } from '../queries/tpms.js';
 
 /** 轮胎压力异常阈值（bar） */
@@ -18,9 +18,11 @@ export class TPMSService {
 
   async getHistory(carId: number, params: TPMSQueryParams = {}): Promise<TPMSRecord[]> {
     const { from = 'now-7d', to = 'now' } = params;
+    const fromTs = parseGrafanaTime(from);
+    const toTs = parseGrafanaTime(to);
 
     const result = await this.client.query<TPMSRecord>(TPMS_QUERIES.history, {
-      variables: { car_id: carId, from, to, limit: 100 },
+      variables: { car_id: carId, from: fromTs, to: toTs, limit: 100 },
     });
 
     return result;
@@ -28,6 +30,8 @@ export class TPMSService {
 
   async getStats(carId: number, params: TPMSQueryParams = {}): Promise<TPMSStats> {
     const { from = 'now-30d', to = 'now' } = params;
+    const fromTs = parseGrafanaTime(from);
+    const toTs = parseGrafanaTime(to);
 
     const [latestResult, statsResult] = await Promise.all([
       this.client.query<TPMSRecord>(TPMS_QUERIES.latest, {
@@ -41,7 +45,7 @@ export class TPMSService {
         min_fl: number | null;
         max_fl: number | null;
       }>(TPMS_QUERIES.stats, {
-        variables: { car_id: carId, from, to },
+        variables: { car_id: carId, from: fromTs, to: toTs },
       }),
     ]);
 

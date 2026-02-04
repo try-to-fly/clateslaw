@@ -62,7 +62,15 @@ export const LOCATIONS_QUERIES = {
 
   /** 获取充电站统计 */
   chargingStations: `
-    WITH station_stats AS (
+    WITH charge_power AS (
+      SELECT
+        c.charging_process_id,
+        MAX(c.charger_power) AS max_power,
+        AVG(c.charger_power) AS avg_power
+      FROM charges c
+      GROUP BY c.charging_process_id
+    ),
+    station_stats AS (
       SELECT
         a.id,
         a.name,
@@ -70,12 +78,13 @@ export const LOCATIONS_QUERIES = {
         a.state,
         COUNT(*) AS total_charges,
         COALESCE(SUM(cp.charge_energy_added), 0) AS total_energy_added,
-        COALESCE(AVG(cp.charger_power), 0) AS avg_power_kw,
+        COALESCE(AVG(chp.avg_power), 0) AS avg_power_kw,
         COALESCE(AVG(EXTRACT(EPOCH FROM (cp.end_date - cp.start_date)) / 60), 0) AS avg_duration_min,
         COALESCE(SUM(cp.cost), 0) AS total_cost,
-        MAX(cp.charger_power) > 50 AS is_supercharger
+        COALESCE(MAX(chp.max_power), 0) > 50 AS is_supercharger
       FROM charging_processes cp
       JOIN addresses a ON a.id = cp.address_id
+      LEFT JOIN charge_power chp ON chp.charging_process_id = cp.id
       WHERE cp.car_id = $car_id
         AND cp.charge_energy_added > 0
       GROUP BY a.id, a.name, a.city, a.state
