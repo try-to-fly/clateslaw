@@ -1,5 +1,6 @@
 import { useData, type WeeklyData } from '../hooks/useData';
 import { useTheme } from '../hooks/useTheme';
+import { getCardClass, getAccentColor } from '../hooks/useStyles';
 import { DailyRouteMap } from '../components/maps/DailyRouteMap';
 import {
   formatDuration,
@@ -20,15 +21,8 @@ export default function WeeklyPage() {
 
   const { periodLabel, drives, charges, allPositions, stats, comparison } = data;
 
-  const cardClass =
-    theme === 'cyberpunk'
-      ? 'theme-card cyber-border rounded-lg overflow-hidden'
-      : theme === 'glass'
-        ? 'theme-card glass-card rounded-xl overflow-hidden'
-        : 'theme-card rounded-lg overflow-hidden';
-
-  const accentColor =
-    theme === 'cyberpunk' ? '#00f5ff' : theme === 'glass' ? '#3b82f6' : '#e82127';
+  const cardClass = getCardClass(theme);
+  const accentColor = getAccentColor(theme);
 
   return (
     <div className="theme-bg p-2 space-y-2 screenshot-container">

@@ -1,5 +1,6 @@
 import { useData, type ChargeData } from '../hooks/useData';
 import { useTheme } from '../hooks/useTheme';
+import { getCardClass } from '../hooks/useStyles';
 import { BatteryRing } from '../components/charts/BatteryRing';
 import { ChargeCurve } from '../components/charts/ChargeCurve';
 import { formatDuration } from '../lib/utils';
@@ -23,13 +24,7 @@ export default function ChargePage() {
       ? ((charge.charge_energy_added / charge.charge_energy_used) * 100).toFixed(0)
       : '100';
 
-  const cardClass =
-    theme === 'cyberpunk'
-      ? 'theme-card cyber-border rounded-lg overflow-hidden'
-      : theme === 'glass'
-        ? 'theme-card glass-card rounded-xl overflow-hidden'
-        : 'theme-card rounded-lg overflow-hidden';
-
+  const cardClass = getCardClass(theme);
   const levelChange = charge.end_battery_level - charge.start_battery_level;
 
   return (

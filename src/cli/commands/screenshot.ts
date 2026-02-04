@@ -4,25 +4,17 @@ import * as path from 'node:path';
 import * as http from 'node:http';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import puppeteer from 'puppeteer';
 import handler from 'serve-handler';
 import { getGrafanaClient, DriveService, ChargeService, StatsService } from '../../core/index.js';
+import { getWeekRange, getMonthRange } from '../../core/utils/time.js';
+import { browserPool } from '../../core/utils/browser-pool.js';
+import { SCREENSHOT } from '../../constants.js';
 import { config } from '../../config/index.js';
 import type { DriveRecord, DrivePosition } from '../../types/drive.js';
 import type { ChargeRecord, ChargeCurvePoint } from '../../types/charge.js';
 import { getMockDriveData, getMockChargeData, getMockDailyData } from './screenshot-mock.js';
 import { executeQuery } from '../../core/query-executor.js';
 import type { TeslaQuery } from '../../types/query-protocol.js';
-
-function findChromePath(): string | undefined {
-  const paths = [
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', // macOS
-    '/opt/homebrew/bin/chromium', // macOS Homebrew
-    '/usr/bin/google-chrome', // Linux
-    '/usr/bin/chromium-browser', // Linux
-  ];
-  return paths.find(p => fs.existsSync(p));
-}
 
 interface DriveData {
   drive: DriveRecord;
@@ -95,8 +87,6 @@ interface MonthlyData {
   };
 }
 
-const DEFAULT_WIDTH = 402;
-const DEFAULT_SCALE = 3;
 const execAsync = promisify(exec);
 
 function getNewestMtime(dir: string): number {
@@ -180,15 +170,10 @@ async function takeScreenshot(
   width: number,
   scale: number
 ): Promise<void> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: findChromePath(),
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
+  const browser = await browserPool.getBrowser();
+  const page = await browser.newPage();
 
   try {
-    const page = await browser.newPage();
-
     // 设置初始视口，高度设置较大以减少视口调整次数
     await page.setViewport({
       width,
@@ -250,7 +235,7 @@ async function takeScreenshot(
 
     console.log(`截图已保存: ${outputPath}`);
   } finally {
-    await browser.close();
+    await page.close();
   }
 }
 
@@ -346,64 +331,6 @@ async function getDailyData(carId: number, dateStr: string): Promise<DailyData> 
   return { date: dateStr, drives, charges, allPositions, stats };
 }
 
-/**
- * 获取指定日期所在周的起止日期（周一到周日）
- */
-function getWeekRange(dateStr?: string): { from: string; to: string; label: string } {
-  const date = dateStr ? new Date(dateStr) : new Date();
-  const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-
-  const monday = new Date(date);
-  monday.setDate(date.getDate() + diff);
-  monday.setHours(0, 0, 0, 0);
-
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-
-  const weekNum = getWeekNumber(monday);
-  const label = `${monday.getFullYear()}年第${weekNum}周`;
-
-  return {
-    from: monday.toISOString(),
-    to: sunday.toISOString(),
-    label,
-  };
-}
-
-/**
- * 获取指定日期所在月的起止日期
- */
-function getMonthRange(dateStr?: string): { from: string; to: string; label: string } {
-  const date = dateStr ? new Date(dateStr) : new Date();
-
-  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
-  firstDay.setHours(0, 0, 0, 0);
-
-  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  lastDay.setHours(23, 59, 59, 999);
-
-  const label = `${date.getFullYear()}年${date.getMonth() + 1}月`;
-
-  return {
-    from: firstDay.toISOString(),
-    to: lastDay.toISOString(),
-    label,
-  };
-}
-
-/**
- * 获取ISO周数
- */
-function getWeekNumber(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-}
-
 async function getWeeklyData(carId: number, dateStr?: string): Promise<WeeklyData> {
   const client = getGrafanaClient();
   const driveService = new DriveService(client);
@@ -486,8 +413,8 @@ async function screenshotDrive(
   id: string | undefined,
   options: ScreenshotOptions
 ): Promise<void> {
-  const width = parseInt(options.width || String(DEFAULT_WIDTH), 10);
-  const scale = parseInt(options.scale || String(DEFAULT_SCALE), 10);
+  const width = parseInt(options.width || String(SCREENSHOT.DEFAULT_WIDTH), 10);
+  const scale = parseInt(options.scale || String(SCREENSHOT.DEFAULT_SCALE), 10);
 
   let data: DriveData;
   let driveId: number;
@@ -538,8 +465,8 @@ async function screenshotCharge(
   id: string | undefined,
   options: ScreenshotOptions
 ): Promise<void> {
-  const width = parseInt(options.width || String(DEFAULT_WIDTH), 10);
-  const scale = parseInt(options.scale || String(DEFAULT_SCALE), 10);
+  const width = parseInt(options.width || String(SCREENSHOT.DEFAULT_WIDTH), 10);
+  const scale = parseInt(options.scale || String(SCREENSHOT.DEFAULT_SCALE), 10);
 
   let data: ChargeData;
   let chargeId: number;
@@ -590,8 +517,8 @@ async function screenshotDaily(
   dateStr: string | undefined,
   options: ScreenshotOptions
 ): Promise<void> {
-  const width = parseInt(options.width || String(DEFAULT_WIDTH), 10);
-  const scale = parseInt(options.scale || String(DEFAULT_SCALE), 10);
+  const width = parseInt(options.width || String(SCREENSHOT.DEFAULT_WIDTH), 10);
+  const scale = parseInt(options.scale || String(SCREENSHOT.DEFAULT_SCALE), 10);
 
   let data: DailyData;
   let date: string;
@@ -632,8 +559,8 @@ async function screenshotWeekly(
   dateStr: string | undefined,
   options: ScreenshotOptions
 ): Promise<void> {
-  const width = parseInt(options.width || String(DEFAULT_WIDTH), 10);
-  const scale = parseInt(options.scale || String(DEFAULT_SCALE), 10);
+  const width = parseInt(options.width || String(SCREENSHOT.DEFAULT_WIDTH), 10);
+  const scale = parseInt(options.scale || String(SCREENSHOT.DEFAULT_SCALE), 10);
   const carId = parseInt(options.carId || '1', 10);
 
   console.log('正在获取周报数据...');
@@ -665,8 +592,8 @@ async function screenshotMonthly(
   dateStr: string | undefined,
   options: ScreenshotOptions
 ): Promise<void> {
-  const width = parseInt(options.width || String(DEFAULT_WIDTH), 10);
-  const scale = parseInt(options.scale || String(DEFAULT_SCALE), 10);
+  const width = parseInt(options.width || String(SCREENSHOT.DEFAULT_WIDTH), 10);
+  const scale = parseInt(options.scale || String(SCREENSHOT.DEFAULT_SCALE), 10);
   const carId = parseInt(options.carId || '1', 10);
 
   console.log('正在获取月报数据...');
@@ -890,8 +817,8 @@ async function screenshotQuery(
     process.exit(1);
   }
 
-  const width = parseInt(options.width || String(DEFAULT_WIDTH), 10);
-  const scale = parseInt(options.scale || String(DEFAULT_SCALE), 10);
+  const width = parseInt(options.width || String(SCREENSHOT.DEFAULT_WIDTH), 10);
+  const scale = parseInt(options.scale || String(SCREENSHOT.DEFAULT_SCALE), 10);
   const carId = parseInt(options.carId || String(query.carId || 1), 10);
 
   // 3. 确定页面类型
@@ -936,8 +863,8 @@ export const screenshotCommand = new Command('screenshot')
       .description('Screenshot drive details')
       .argument('[id]', 'Drive ID (defaults to latest)')
       .option('-o, --output <path>', 'Output file path')
-      .option('-w, --width <number>', 'Viewport width', String(DEFAULT_WIDTH))
-      .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
+      .option('-w, --width <number>', 'Viewport width', String(SCREENSHOT.DEFAULT_WIDTH))
+      .option('--scale <number>', 'Device pixel ratio', String(SCREENSHOT.DEFAULT_SCALE))
       .option('-c, --car-id <number>', 'Car ID', '1')
       .option('-s, --send', '发送到 Telegram 后删除文件')
       .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
@@ -951,8 +878,8 @@ export const screenshotCommand = new Command('screenshot')
       .description('Screenshot charge details')
       .argument('[id]', 'Charge ID (defaults to latest)')
       .option('-o, --output <path>', 'Output file path')
-      .option('-w, --width <number>', 'Viewport width', String(DEFAULT_WIDTH))
-      .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
+      .option('-w, --width <number>', 'Viewport width', String(SCREENSHOT.DEFAULT_WIDTH))
+      .option('--scale <number>', 'Device pixel ratio', String(SCREENSHOT.DEFAULT_SCALE))
       .option('-c, --car-id <number>', 'Car ID', '1')
       .option('-s, --send', '发送到 Telegram 后删除文件')
       .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
@@ -966,8 +893,8 @@ export const screenshotCommand = new Command('screenshot')
       .description('Screenshot daily overview')
       .argument('[date]', 'Date (YYYY-MM-DD, defaults to today)')
       .option('-o, --output <path>', 'Output file path')
-      .option('-w, --width <number>', 'Viewport width', String(DEFAULT_WIDTH))
-      .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
+      .option('-w, --width <number>', 'Viewport width', String(SCREENSHOT.DEFAULT_WIDTH))
+      .option('--scale <number>', 'Device pixel ratio', String(SCREENSHOT.DEFAULT_SCALE))
       .option('-c, --car-id <number>', 'Car ID', '1')
       .option('-s, --send', '发送到 Telegram 后删除文件')
       .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
@@ -981,8 +908,8 @@ export const screenshotCommand = new Command('screenshot')
       .description('Screenshot weekly overview')
       .argument('[date]', 'Date within the week (YYYY-MM-DD, defaults to current week)')
       .option('-o, --output <path>', 'Output file path')
-      .option('-w, --width <number>', 'Viewport width', String(DEFAULT_WIDTH))
-      .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
+      .option('-w, --width <number>', 'Viewport width', String(SCREENSHOT.DEFAULT_WIDTH))
+      .option('--scale <number>', 'Device pixel ratio', String(SCREENSHOT.DEFAULT_SCALE))
       .option('-c, --car-id <number>', 'Car ID', '1')
       .option('-s, --send', '发送到 Telegram 后删除文件')
       .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
@@ -995,8 +922,8 @@ export const screenshotCommand = new Command('screenshot')
       .description('Screenshot monthly overview')
       .argument('[date]', 'Date within the month (YYYY-MM-DD, defaults to current month)')
       .option('-o, --output <path>', 'Output file path')
-      .option('-w, --width <number>', 'Viewport width', String(DEFAULT_WIDTH))
-      .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
+      .option('-w, --width <number>', 'Viewport width', String(SCREENSHOT.DEFAULT_WIDTH))
+      .option('--scale <number>', 'Device pixel ratio', String(SCREENSHOT.DEFAULT_SCALE))
       .option('-c, --car-id <number>', 'Car ID', '1')
       .option('-s, --send', '发送到 Telegram 后删除文件')
       .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')
@@ -1009,8 +936,8 @@ export const screenshotCommand = new Command('screenshot')
       .description('Screenshot from TeslaQuery JSON')
       .argument('<json>', 'TeslaQuery JSON string or file path')
       .option('-o, --output <path>', 'Output file path')
-      .option('-w, --width <number>', 'Viewport width', String(DEFAULT_WIDTH))
-      .option('--scale <number>', 'Device pixel ratio', String(DEFAULT_SCALE))
+      .option('-w, --width <number>', 'Viewport width', String(SCREENSHOT.DEFAULT_WIDTH))
+      .option('--scale <number>', 'Device pixel ratio', String(SCREENSHOT.DEFAULT_SCALE))
       .option('-c, --car-id <number>', 'Car ID')
       .option('-s, --send', '发送到 Telegram 后删除文件')
       .option('-t, --target <id>', '消息目标 ID (默认: OPENCLAW_TARGET)')

@@ -127,6 +127,17 @@ export async function executeQuery(query: TeslaQuery): Promise<QueryResult> {
         break;
       }
 
+      case 'locations.charging': {
+        const service = new LocationService(client);
+        data = await service.getChargingStations({
+          carId,
+          from,
+          to,
+          top: query.extra?.top ?? 20,
+        });
+        break;
+      }
+
       case 'timeline': {
         const service = new TimelineService(client);
         data = await service.getTimeline({ carId, from, to, limit });

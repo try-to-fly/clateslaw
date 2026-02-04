@@ -116,10 +116,14 @@ export class GrafanaQueryError extends Error {
 export class GrafanaClient {
   private readonly client: Got;
   private readonly datasource: GrafanaDataSource;
+  private readonly cache: Map<string, { data: unknown[]; expiry: number }>;
+  private readonly cacheTTL: number;
 
   constructor(config: GrafanaClientConfig) {
     const baseUrl = config.baseUrl.replace(/\/$/, '');
     this.datasource = config.datasource ?? DEFAULT_DATASOURCE;
+    this.cache = new Map();
+    this.cacheTTL = config.cacheTTL ?? 5 * 60 * 1000; // 默认 5 分钟
 
     this.client = got.extend({
       prefixUrl: baseUrl,
@@ -131,6 +135,32 @@ export class GrafanaClient {
   }
 
   /**
+   * 生成缓存键
+   */
+  private generateCacheKey(sql: string, timeRange?: { from: string; to: string }): string {
+    return JSON.stringify({ sql, from: timeRange?.from, to: timeRange?.to });
+  }
+
+  /**
+   * 清理过期缓存
+   */
+  private cleanExpiredCache(): void {
+    const now = Date.now();
+    for (const [key, value] of this.cache.entries()) {
+      if (value.expiry < now) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  /**
+   * 清空所有缓存
+   */
+  clearCache(): void {
+    this.cache.clear();
+  }
+
+  /**
    * 执行 SQL 查询并返回解析后的数据
    */
   async query<T>(
@@ -138,8 +168,30 @@ export class GrafanaClient {
     options: QueryOptions = {}
   ): Promise<T[]> {
     const sql = this.replaceVariables(rawSql, options.variables ?? {});
+    const cacheKey = this.generateCacheKey(sql, options.timeRange);
+
+    // 检查缓存
+    const cached = this.cache.get(cacheKey);
+    if (cached && cached.expiry > Date.now()) {
+      return cached.data as T[];
+    }
+
+    // 执行查询
     const response = await this.executeQuery(sql, options.timeRange);
-    return this.parseResponse<T>(response);
+    const data = this.parseResponse<T>(response);
+
+    // 存入缓存
+    this.cache.set(cacheKey, {
+      data,
+      expiry: Date.now() + this.cacheTTL,
+    });
+
+    // 定期清理过期缓存
+    if (this.cache.size > 100) {
+      this.cleanExpiredCache();
+    }
+
+    return data;
   }
 
   /**

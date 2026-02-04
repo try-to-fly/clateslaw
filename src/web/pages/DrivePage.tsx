@@ -1,5 +1,6 @@
 import { useData, type DriveData } from '../hooks/useData';
 import { useTheme } from '../hooks/useTheme';
+import { getCardClass, getAccentColor } from '../hooks/useStyles';
 import { DriveRoute } from '../components/maps/DriveRoute';
 import { formatDuration } from '../lib/utils';
 
@@ -26,15 +27,8 @@ export default function DrivePage() {
   const startBattery = positions.length > 0 ? positions[0].battery_level : 0;
   const endBattery = positions.length > 0 ? positions[positions.length - 1].battery_level : 0;
 
-  const cardClass =
-    theme === 'cyberpunk'
-      ? 'theme-card cyber-border rounded-lg overflow-hidden'
-      : theme === 'glass'
-        ? 'theme-card glass-card rounded-xl overflow-hidden'
-        : 'theme-card rounded-lg overflow-hidden';
-
-  const accentColor =
-    theme === 'cyberpunk' ? '#00f5ff' : theme === 'glass' ? '#3b82f6' : '#e82127';
+  const cardClass = getCardClass(theme);
+  const accentColor = getAccentColor(theme);
 
   return (
     <div className="theme-bg p-1.5 screenshot-container">

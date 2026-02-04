@@ -59,4 +59,39 @@ export const LOCATIONS_QUERIES = {
     ORDER BY lv.visit_count DESC
     LIMIT $top
   `,
+
+  /** 获取充电站统计 */
+  chargingStations: `
+    WITH station_stats AS (
+      SELECT
+        a.id,
+        a.name,
+        a.city,
+        a.state,
+        COUNT(*) AS total_charges,
+        COALESCE(SUM(cp.charge_energy_added), 0) AS total_energy_added,
+        COALESCE(AVG(cp.charger_power), 0) AS avg_power_kw,
+        COALESCE(AVG(EXTRACT(EPOCH FROM (cp.end_date - cp.start_date)) / 60), 0) AS avg_duration_min,
+        COALESCE(SUM(cp.cost), 0) AS total_cost,
+        MAX(cp.charger_power) > 50 AS is_supercharger
+      FROM charging_processes cp
+      JOIN addresses a ON a.id = cp.address_id
+      WHERE cp.car_id = $car_id
+        AND cp.charge_energy_added > 0
+      GROUP BY a.id, a.name, a.city, a.state
+    )
+    SELECT
+      name,
+      city,
+      state,
+      total_charges,
+      total_energy_added,
+      avg_power_kw,
+      avg_duration_min,
+      total_cost,
+      is_supercharger
+    FROM station_stats
+    ORDER BY total_charges DESC
+    LIMIT $top
+  `,
 } as const;

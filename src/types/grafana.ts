@@ -56,4 +56,6 @@ export interface GrafanaClientConfig {
   baseUrl: string;
   token: string;
   datasource?: GrafanaDataSource;
+  /** 查询缓存 TTL（毫秒），默认 5 分钟 */
+  cacheTTL?: number;
 }

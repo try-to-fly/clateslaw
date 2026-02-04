@@ -9,6 +9,7 @@ export type QueryType =
   | 'mileage'
   | 'vampire'
   | 'locations'
+  | 'locations.charging'
   | 'timeline'
   | 'visited'
   | 'projected-range'

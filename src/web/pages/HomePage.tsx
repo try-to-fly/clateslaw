@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useData, type TeslaData } from '../hooks/useData';
 import { useTheme } from '../hooks/useTheme';
+import { getCardClass } from '../hooks/useStyles';
 import type { HomeData } from '../demo/home';
 
 function isHomeData(data: TeslaData | HomeData): data is HomeData {
@@ -21,13 +22,7 @@ export default function HomePage() {
 
   const { car, overview, recentDrive, recentCharge } = data;
 
-  const cardClass =
-    theme === 'cyberpunk'
-      ? 'theme-card cyber-border rounded-lg overflow-hidden'
-      : theme === 'glass'
-        ? 'theme-card glass-card rounded-xl overflow-hidden'
-        : 'theme-card rounded-lg overflow-hidden';
-
+  const cardClass = getCardClass(theme);
   const linkCardClass = `${cardClass} block transition-all duration-200 hover:border-[var(--theme-accent)]`;
 
   return (
