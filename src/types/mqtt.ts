@@ -21,6 +21,12 @@ export interface RangeSnapshot {
   timestamp: number;
 }
 
+export interface ParkingSnapshot {
+  timestamp: number;
+  rated_range_km: number | null;
+  usable_battery_level: number | null;
+}
+
 export interface StateTracker {
   vehicleState: VehicleState | null;
   chargingState: ChargingState | null;
@@ -28,11 +34,12 @@ export interface StateTracker {
   lastChargeTrigger: number;
   lastOfflineRange: RangeSnapshot | null;
   lastOnlineTrigger: number;
-  // 新增字段
+  // New fields
   sleepStartTime: number | null;
   updateAvailable: boolean;
   updateVersion: string | null;
   lastUpdateNotifyTime: number;
+  lastParkStart: ParkingSnapshot | null;
 }
 
 export interface PersistedMqttState {
@@ -46,6 +53,7 @@ export interface PersistedMqttState {
   updateAvailable: boolean;
   updateVersion: string | null;
   lastUpdateNotifyTime: number;
+  lastParkStart: ParkingSnapshot | null;
   lastUpdated: number;
 }
 

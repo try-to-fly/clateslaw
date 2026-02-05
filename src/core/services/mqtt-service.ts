@@ -3,7 +3,14 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { VehicleState, ChargingState, StateTracker, RangeSnapshot, PersistedMqttState } from '../../types/mqtt.js';
+import type {
+  VehicleState,
+  ChargingState,
+  StateTracker,
+  RangeSnapshot,
+  PersistedMqttState,
+  ParkingSnapshot,
+} from '../../types/mqtt.js';
 import { SLEEP_STATES } from '../../types/mqtt.js';
 import { getMessageService } from './message-service.js';
 import { getGrafanaClient } from '../index.js';
@@ -38,7 +45,11 @@ export class MqttService {
     updateAvailable: false,
     updateVersion: null,
     lastUpdateNotifyTime: 0,
+    lastParkStart: null,
   };
+
+  private lastRatedRangeKm: number | null = null;
+  private lastUsableBatteryLevel: number | null = null;
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: MqttServiceOptions) {
@@ -111,6 +122,9 @@ export class MqttService {
       `${topicPrefix}/cars/${carId}/charging_state`,
       `${topicPrefix}/cars/${carId}/update_available`,
       `${topicPrefix}/cars/${carId}/update_version`,
+      // TeslaMate MQTT: rated range + usable battery percent for park-loss tracking
+      `${topicPrefix}/cars/${carId}/rated_battery_range_km`,
+      `${topicPrefix}/cars/${carId}/usable_battery_level`,
     ];
 
     topics.forEach((topic) => {
@@ -130,6 +144,12 @@ export class MqttService {
     const chargingTopic = `${topicPrefix}/cars/${carId}/charging_state`;
     const updateAvailableTopic = `${topicPrefix}/cars/${carId}/update_available`;
     const updateVersionTopic = `${topicPrefix}/cars/${carId}/update_version`;
+    const ratedRangeTopic = `${topicPrefix}/cars/${carId}/rated_battery_range_km`;
+    const usableBatteryTopic = `${topicPrefix}/cars/${carId}/usable_battery_level`;
+
+    if (process.env.MQTT_DEBUG === '1') {
+      console.log(`[mqtt] ${topic} = ${message}`);
+    }
 
     if (topic === stateTopic) {
       this.handleVehicleStateChange(message as VehicleState);
@@ -139,6 +159,10 @@ export class MqttService {
       this.handleUpdateAvailable(message === 'true');
     } else if (topic === updateVersionTopic) {
       this.handleUpdateVersion(message);
+    } else if (topic === ratedRangeTopic) {
+      this.handleRatedRange(message);
+    } else if (topic === usableBatteryTopic) {
+      this.handleUsableBatteryLevel(message);
     }
   }
 
@@ -147,6 +171,16 @@ export class MqttService {
     this.state.vehicleState = newState;
 
     console.log(`车辆状态: ${prevState || '(初始化)'} -> ${newState}`);
+
+    // Track park-loss window boundaries:
+    // - driving -> non-driving: mark park start snapshot
+    // - non-driving -> driving: compute and log loss since park start
+    if (prevState === 'driving' && newState !== 'driving') {
+      this.markParkStart();
+    }
+    if (prevState && prevState !== 'driving' && newState === 'driving') {
+      this.logParkLoss('drive_start');
+    }
 
     const wasSleeping = prevState && SLEEP_STATES.includes(prevState);
     const isSleeping = SLEEP_STATES.includes(newState);
@@ -308,6 +342,78 @@ export class MqttService {
     }
   }
 
+  private handleRatedRange(message: string): void {
+    const parsed = Number(message);
+    if (Number.isFinite(parsed)) {
+      // TeslaMate provides a float; we keep a 0.1km precision.
+      this.lastRatedRangeKm = Math.round(parsed * 10) / 10;
+    }
+  }
+
+  private handleUsableBatteryLevel(message: string): void {
+    const parsed = Number(message);
+    if (Number.isFinite(parsed)) {
+      // TeslaMate provides a float; we keep a 0.1% precision.
+      this.lastUsableBatteryLevel = Math.round(parsed * 10) / 10;
+    }
+  }
+
+  private currentParkingSnapshot(): ParkingSnapshot {
+    const rated = this.lastRatedRangeKm;
+    const level = this.lastUsableBatteryLevel;
+
+    return {
+      timestamp: Date.now(),
+      rated_range_km: typeof rated === 'number' ? rated : null,
+      usable_battery_level: typeof level === 'number' ? level : null,
+    };
+  }
+
+  private markParkStart(): void {
+    this.state.lastParkStart = this.currentParkingSnapshot();
+
+    const r = this.state.lastParkStart.rated_range_km;
+    const l = this.state.lastParkStart.usable_battery_level;
+    console.log(
+      `ParkStart: rated=${r ?? 'n/a'}km usable=${l ?? 'n/a'}%`
+    );
+  }
+
+  private logParkLoss(reason: 'drive_start'): void {
+    if (!this.state.lastParkStart) return;
+
+    const start = this.state.lastParkStart;
+    const end = this.currentParkingSnapshot();
+    const dtHours = (end.timestamp - start.timestamp) / 3600000;
+
+    const rangeLoss =
+      start.rated_range_km != null && end.rated_range_km != null
+        ? Math.round((start.rated_range_km - end.rated_range_km) * 10) / 10
+        : null;
+
+    const levelLoss =
+      start.usable_battery_level != null && end.usable_battery_level != null
+        ? Math.round((start.usable_battery_level - end.usable_battery_level) * 10) / 10
+        : null;
+
+    const startRange = start.rated_range_km != null ? `${start.rated_range_km}km` : 'n/a';
+    const endRange = end.rated_range_km != null ? `${end.rated_range_km}km` : 'n/a';
+    const startLevel = start.usable_battery_level != null ? `${start.usable_battery_level}%` : 'n/a';
+    const endLevel = end.usable_battery_level != null ? `${end.usable_battery_level}%` : 'n/a';
+
+    console.log(
+      `ParkLoss(${reason}): dt=${dtHours.toFixed(2)}h ` +
+        `usable=${startLevel}->${endLevel}` +
+        (levelLoss != null ? ` (-${levelLoss}%)` : '') +
+        ` rated=${startRange}->${endRange}` +
+        (rangeLoss != null ? ` (-${rangeLoss}km)` : '')
+    );
+
+    // Reset after reporting, so next park window is a new segment.
+    this.state.lastParkStart = null;
+    this.schedulePersist();
+  }
+
   /**
    * 处理更新可用状态
    */
@@ -402,6 +508,7 @@ export class MqttService {
       this.state.updateAvailable = persisted.updateAvailable;
       this.state.updateVersion = persisted.updateVersion;
       this.state.lastUpdateNotifyTime = persisted.lastUpdateNotifyTime;
+      this.state.lastParkStart = persisted.lastParkStart || null;
 
       console.log(`已加载持久化状态: ${statePath}`);
       console.log(`  车辆状态: ${this.state.vehicleState || '(无)'}`);
@@ -411,6 +518,11 @@ export class MqttService {
       }
       if (this.state.updateAvailable) {
         console.log(`  待更新版本: ${this.state.updateVersion}`);
+      }
+      if (this.state.lastParkStart) {
+        console.log(
+          `  停车开始: ${new Date(this.state.lastParkStart.timestamp).toLocaleString()} rated=${this.state.lastParkStart.rated_range_km ?? 'n/a'}km usable=${this.state.lastParkStart.usable_battery_level ?? 'n/a'}%`
+        );
       }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -437,6 +549,7 @@ export class MqttService {
       updateAvailable: this.state.updateAvailable,
       updateVersion: this.state.updateVersion,
       lastUpdateNotifyTime: this.state.lastUpdateNotifyTime,
+      lastParkStart: this.state.lastParkStart,
       lastUpdated: Date.now(),
     };
 
