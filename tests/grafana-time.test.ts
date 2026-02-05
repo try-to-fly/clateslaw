@@ -49,6 +49,33 @@ describe('parseGrafanaTime', () => {
   });
 
   describe('Boundary alignment', () => {
+    it('should parse "today" to start of day', () => {
+      const result = parseGrafanaTime('today');
+      const parsed = new Date(result);
+      expect(parsed.getHours()).toBe(0);
+      expect(parsed.getMinutes()).toBe(0);
+      expect(parsed.getSeconds()).toBe(0);
+      expect(parsed.getMilliseconds()).toBe(0);
+    });
+
+    it('should parse "day" to start of day', () => {
+      const result = parseGrafanaTime('day');
+      const parsed = new Date(result);
+      expect(parsed.getHours()).toBe(0);
+      expect(parsed.getMinutes()).toBe(0);
+      expect(parsed.getSeconds()).toBe(0);
+      expect(parsed.getMilliseconds()).toBe(0);
+    });
+
+    it('should parse "yesterday" to start of yesterday', () => {
+      const result = parseGrafanaTime('yesterday');
+      const parsed = new Date(result);
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+      expect(parsed.getTime()).toBe(yesterday.getTime());
+    });
+
     it('should parse "now/d" to start of day', () => {
       const result = parseGrafanaTime('now/d');
       const parsed = new Date(result);
@@ -65,6 +92,14 @@ describe('parseGrafanaTime', () => {
       yesterday.setDate(yesterday.getDate() - 1);
       yesterday.setHours(0, 0, 0, 0);
       expect(parsed.getTime()).toBe(yesterday.getTime());
+    });
+
+    it('should parse "month" to start of month', () => {
+      const result = parseGrafanaTime('month');
+      const parsed = new Date(result);
+      expect(parsed.getDate()).toBe(1);
+      expect(parsed.getHours()).toBe(0);
+      expect(parsed.getMinutes()).toBe(0);
     });
 
     it('should parse "now/M" to start of month', () => {
@@ -85,12 +120,30 @@ describe('parseGrafanaTime', () => {
       expect(parsed.getTime()).toBe(lastMonth.getTime());
     });
 
+    it('should parse "year" to start of year', () => {
+      const result = parseGrafanaTime('year');
+      const parsed = new Date(result);
+      expect(parsed.getMonth()).toBe(0);
+      expect(parsed.getDate()).toBe(1);
+      expect(parsed.getHours()).toBe(0);
+    });
+
     it('should parse "now/y" to start of year', () => {
       const result = parseGrafanaTime('now/y');
       const parsed = new Date(result);
       expect(parsed.getMonth()).toBe(0);
       expect(parsed.getDate()).toBe(1);
       expect(parsed.getHours()).toBe(0);
+    });
+
+    it('should parse "week" to start of week (Monday)', () => {
+      const result = parseGrafanaTime('week');
+      const parsed = new Date(result);
+      // Monday is day 1
+      const day = parsed.getDay();
+      expect(day).toBe(1);
+      expect(parsed.getHours()).toBe(0);
+      expect(parsed.getMinutes()).toBe(0);
     });
 
     it('should parse "now/w" to start of week (Monday)', () => {

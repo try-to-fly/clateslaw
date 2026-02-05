@@ -12,6 +12,28 @@ import type {
  * 支持边界: now/d, now/w, now/M, now/y, now-1d/d 等
  */
 export function parseGrafanaTime(timeStr: string): string {
+  // Normalize some human-friendly aliases into Grafana-style relative time.
+  // This keeps the CLI ergonomic (e.g. `-f week`) while still producing
+  // concrete ISO timestamps for SQL queries.
+  switch (timeStr) {
+    case 'today':
+    case 'day':
+      timeStr = 'now/d';
+      break;
+    case 'yesterday':
+      timeStr = 'now-1d/d';
+      break;
+    case 'week':
+      timeStr = 'now/w';
+      break;
+    case 'month':
+      timeStr = 'now/M';
+      break;
+    case 'year':
+      timeStr = 'now/y';
+      break;
+  }
+
   const now = new Date();
 
   // 处理纯 now
