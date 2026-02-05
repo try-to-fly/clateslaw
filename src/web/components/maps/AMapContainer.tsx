@@ -39,15 +39,16 @@ export function AMapContainer({ onMapReady, className, theme = 'tesla' }: AMapCo
         // 先执行 onMapReady（会调用 setFitView）
         onMapReady?.(map, AMap);
 
-        // setFitView 后监听 complete 事件，等待新视野的瓦片加载完成
+        // setFitView 后监听 complete 事件，等待新视野的瓦片加载完成。
+        // 注意: complete 可能在初次渲染或连续 setFitView 时多次触发。
         const markReady = () => {
           containerRef.current?.setAttribute('data-map-ready', 'true');
+          containerRef.current?.setAttribute('data-map-centered', 'true');
         };
 
-        // 监听 complete 事件
         map.on('complete', markReady);
 
-        // 备用：如果 complete 事件已经触发过，用延迟兜底
+        // 备用：如果 complete 事件未触发，用延迟兜底
         setTimeout(markReady, 2000);
       })
       .catch((e) => {

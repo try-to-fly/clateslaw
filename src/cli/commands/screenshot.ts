@@ -245,6 +245,12 @@ async function takeScreenshot(
     try {
       await page.waitForSelector('[data-map-ready="true"]', { timeout: 8000 });
       console.log('地图加载完成');
+
+      // 地图在 fitView/瓦片加载过程中截图容易出现“轨迹未居中”的瞬间。
+      // 多等一会儿，尽量等到 complete 事件后再截。
+      await page.waitForSelector('[data-map-centered="true"]', { timeout: 8000 });
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      console.log('地图视野稳定，准备截图');
     } catch {
       console.log('页面无地图或地图加载超时，继续执行');
     }
