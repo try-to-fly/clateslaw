@@ -4,6 +4,20 @@ import { config } from '../../config/index.js';
 
 const execAsync = promisify(exec);
 
+function proxyEnvPrefix(): string {
+  // Avoid committing sensitive info by not hard-coding proxy URLs.
+  // If the runtime already has proxy env vars set, forward them to the OpenClaw CLI.
+  const keys = ['HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY', 'NO_PROXY'] as const;
+  const parts = keys
+    .map((k) => {
+      const v = process.env[k];
+      return v ? `${k}=${JSON.stringify(v)}` : null;
+    })
+    .filter(Boolean);
+
+  return parts.length ? `${parts.join(' ')} ` : '';
+}
+
 export interface MessageOptions {
   target?: string;
 }
@@ -31,7 +45,7 @@ export class MessageService {
     const target = options?.target || this.defaultTarget;
     const escapedMessage = escapeShellArg(message);
 
-    const command = `openclaw message send --channel ${this.channel} --target ${target} --message "${escapedMessage}"`;
+    const command = `${proxyEnvPrefix()}openclaw message send --channel ${this.channel} --target ${target} --message "${escapedMessage}"`;
 
     try {
       await execAsync(command);
@@ -53,7 +67,7 @@ export class MessageService {
     const target = options?.target || this.defaultTarget;
     const escapedMessage = escapeShellArg(message);
 
-    const command = `openclaw message send --channel ${this.channel} --target ${target} --message "${escapedMessage}" --media "${mediaPath}"`;
+    const command = `${proxyEnvPrefix()}openclaw message send --channel ${this.channel} --target ${target} --message "${escapedMessage}" --media "${mediaPath}"`;
 
     try {
       await execAsync(command);
