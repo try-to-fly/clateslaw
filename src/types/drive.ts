@@ -8,6 +8,8 @@ export interface DriveRecord {
   speed_max: number;
   power_max: number;
   outside_temp_avg: number;
+  start_rated_range_km?: number | null;
+  end_rated_range_km?: number | null;
   start_location: string;
   end_location: string;
 }

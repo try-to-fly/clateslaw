@@ -83,6 +83,35 @@ export default function DailyPage() {
         <DailyRouteMap allPositions={allPositions} theme={theme} />
       )}
 
+      {/* 行程列表 - 紧凑（时间 / 时长 / 距离） */}
+      {drives.length > 0 && (
+        <div className={cardClass}>
+          <div className="px-2.5 py-1 border-b border-[var(--theme-card-border)] flex items-center justify-between">
+            <span className="text-xs font-medium theme-text">🚗 行程 ({drives.length})</span>
+            <span className="text-xs theme-text-muted">
+              {stats.totalDistance.toFixed(1)} km · {formatDuration(stats.totalDuration)}
+            </span>
+          </div>
+          <div className="divide-y divide-[var(--theme-card-border)]">
+            {drives.map((d) => (
+              <div key={d.id} className="px-2.5 py-1 flex items-center justify-between text-xs">
+                <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                  <span className="theme-text-muted w-10 shrink-0">
+                    {formatTime(d.start_date)}
+                  </span>
+                  <span className="theme-text truncate">
+                    {formatDuration(d.duration_min)}
+                  </span>
+                </div>
+                <span className="font-medium ml-2 theme-text">
+                  {d.distance.toFixed(1)} km
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 充电列表 - 紧凑 */}
       {charges.length > 0 && (
         <div className={cardClass}>
@@ -108,8 +137,8 @@ export default function DailyPage() {
         </div>
       )}
 
-      {/* 胎压数据 */}
-      {data.tpms && <TpmsCard data={data.tpms} theme={theme} />}
+      {/* 胎压数据（Daily 截图不展示，避免干扰版面） */}
+      {/* {data.tpms && <TpmsCard data={data.tpms} theme={theme} />} */}
     </div>
   );
 }

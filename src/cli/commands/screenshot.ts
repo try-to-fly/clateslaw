@@ -415,7 +415,13 @@ async function getDailyData(carId: number, dateStr: string): Promise<DailyData> 
   const stats = {
     totalDistance: drives.reduce((sum, d) => sum + d.distance, 0),
     totalDuration: drives.reduce((sum, d) => sum + d.duration_min, 0),
-    totalEnergyUsed: charges.reduce((sum, c) => sum + c.charge_energy_used, 0),
+    // Daily 里展示的是“驾驶能耗/效率”，不应该用充电能耗（charge_energy_used）。
+    // 这里用当天所有 drives 的 rated range 掉电量 * 车辆效率估算 (kWh)。
+    // 0.153 来自 TeslaMate cars.efficiency (kWh/km) 的典型值。
+    totalEnergyUsed: drives.reduce(
+      (sum, d: any) => sum + ((Number(d.start_rated_range_km) - Number(d.end_rated_range_km)) * 0.153 || 0),
+      0
+    ),
     totalEnergyAdded: charges.reduce((sum, c) => sum + c.charge_energy_added, 0),
   };
 

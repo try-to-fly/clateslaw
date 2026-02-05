@@ -25,7 +25,7 @@ export function AMapContainer({ onMapReady, className, theme = 'tesla' }: AMapCo
     AMapLoader.load({
       key: apiKey,
       version: '2.0',
-      plugins: ['AMap.Scale', 'AMap.Polyline'],
+      plugins: ['AMap.Scale', 'AMap.Polyline', 'AMap.GeometryUtil'],
     })
       .then((AMap) => {
         if (!containerRef.current) return;
