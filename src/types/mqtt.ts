@@ -40,6 +40,7 @@ export interface StateTracker {
   updateVersion: string | null;
   lastUpdateNotifyTime: number;
   lastParkStart: ParkingSnapshot | null;
+  lastParkNotifyTime: number;
 }
 
 export interface PersistedMqttState {
@@ -54,6 +55,7 @@ export interface PersistedMqttState {
   updateVersion: string | null;
   lastUpdateNotifyTime: number;
   lastParkStart: ParkingSnapshot | null;
+  lastParkNotifyTime: number;
   lastUpdated: number;
 }
 

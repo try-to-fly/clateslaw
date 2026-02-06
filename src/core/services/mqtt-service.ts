@@ -23,6 +23,7 @@ const TRIGGER_DELAY_MS = 30 * 1000; // 30 秒延迟等待数据入库
 const ONLINE_NOTIFY_DELAY_MS = 5 * 1000; // 5 秒延迟发送上线通知
 const PERSIST_DEBOUNCE_MS = 5 * 1000; // 5 秒防抖持久化
 const UPDATE_NOTIFY_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 小时更新通知间隔
+const PARK_NOTIFY_MIN_MS = 60 * 60 * 1000; // 停车->驾驶推送最小间隔（默认 1h）
 
 export interface MqttServiceOptions {
   host: string;
@@ -46,6 +47,7 @@ export class MqttService {
     updateVersion: null,
     lastUpdateNotifyTime: 0,
     lastParkStart: null,
+    lastParkNotifyTime: 0,
   };
 
   private lastRatedRangeKm: number | null = null;
@@ -172,13 +174,21 @@ export class MqttService {
 
     console.log(`车辆状态: ${prevState || '(初始化)'} -> ${newState}`);
 
-    // Track park-loss window boundaries:
-    // - driving -> non-driving: mark park start snapshot
-    // - non-driving -> driving: compute and log loss since park start
+    // Track park window boundaries:
+    // - driving -> non-driving: mark park start snapshot once per park window
+    // - non-driving -> driving: compute and notify (with min interval)
+    //
+    // A "park window" can include multiple intermediate states (online/charging/asleep/etc).
+    // We want the *first* transition out of driving to define the window start.
     if (prevState === 'driving' && newState !== 'driving') {
-      this.markParkStart();
+      if (!this.state.lastParkStart) {
+        this.markParkStart();
+      } else {
+        console.log('ParkStart 已存在（仍在停车窗口内），不重复记录');
+      }
     }
     if (prevState && prevState !== 'driving' && newState === 'driving') {
+      await this.notifyParkDeltaOnDriveStart();
       this.logParkLoss('drive_start');
     }
 
@@ -324,13 +334,14 @@ export class MqttService {
         this.state.sleepStartTime = null;
       }
 
-      // 如果有 offline 时的记录，计算损耗
+      // 如果有 offline 时的记录，计算待机变化（上涨/下跌都展示；完全不变则省略）
       if (this.state.lastOfflineRange) {
-        const rangeLoss = this.state.lastOfflineRange.range_km - currentRange;
-        const levelLoss = this.state.lastOfflineRange.battery_level - currentLevel;
+        const rangeDelta = currentRange - this.state.lastOfflineRange.range_km;
+        const levelDelta = currentLevel - this.state.lastOfflineRange.battery_level;
 
-        if (rangeLoss > 0 || levelLoss > 0) {
-          message += `\n待机损耗: ${rangeLoss} km (${levelLoss}%)`;
+        if (rangeDelta !== 0 || levelDelta !== 0) {
+          const fmt = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+          message += `\n待机变化: ${fmt(rangeDelta)} km (${fmt(levelDelta)}%)`;
         }
       }
 
@@ -379,6 +390,68 @@ export class MqttService {
     );
   }
 
+  private fmtDelta(n: number): string {
+    return n > 0 ? `+${n}` : `${n}`;
+  }
+
+  private async notifyParkDeltaOnDriveStart(): Promise<void> {
+    if (!this.state.lastParkStart) return;
+
+    const now = Date.now();
+    if (now - this.state.lastParkNotifyTime < PARK_NOTIFY_MIN_MS) {
+      console.log('停车->驾驶推送在最小间隔内，跳过');
+      // Still reset, otherwise the next drive start might incorrectly include a short park window.
+      this.state.lastParkStart = null;
+      this.schedulePersist();
+      return;
+    }
+
+    const start = this.state.lastParkStart;
+    const end = this.currentParkingSnapshot();
+    const dtMs = end.timestamp - start.timestamp;
+
+    const rangeDelta =
+      start.rated_range_km != null && end.rated_range_km != null
+        ? Math.round((end.rated_range_km - start.rated_range_km) * 10) / 10
+        : null;
+
+    const levelDelta =
+      start.usable_battery_level != null && end.usable_battery_level != null
+        ? Math.round((end.usable_battery_level - start.usable_battery_level) * 10) / 10
+        : null;
+
+    // Only suppress when both are exactly unchanged.
+    if (rangeDelta === 0 && levelDelta === 0) {
+      console.log('停车->驾驶待机变化为 0，省略推送');
+      this.state.lastParkStart = null;
+      this.schedulePersist();
+      return;
+    }
+
+    try {
+      let message = `🚗 开始驾驶`;
+      message += `\n待机时长: ${this.formatDuration(dtMs)}`;
+
+      if (rangeDelta != null || levelDelta != null) {
+        const r = rangeDelta != null ? this.fmtDelta(rangeDelta) : 'n/a';
+        const l = levelDelta != null ? this.fmtDelta(levelDelta) : 'n/a';
+        message += `\n待机变化: ${r} km (${l}%)`;
+      }
+
+      const messageService = getMessageService();
+      await messageService.sendText(message);
+
+      this.state.lastParkNotifyTime = now;
+      console.log('停车->驾驶推送已发送');
+    } catch (error) {
+      console.error('发送停车->驾驶推送失败:', error instanceof Error ? error.message : error);
+    } finally {
+      // Reset after reporting, so next park window is a new segment.
+      this.state.lastParkStart = null;
+      this.schedulePersist();
+    }
+  }
+
   private logParkLoss(reason: 'drive_start'): void {
     if (!this.state.lastParkStart) return;
 
@@ -409,9 +482,7 @@ export class MqttService {
         (rangeLoss != null ? ` (-${rangeLoss}km)` : '')
     );
 
-    // Reset after reporting, so next park window is a new segment.
-    this.state.lastParkStart = null;
-    this.schedulePersist();
+    // Note: we intentionally do not reset here; reset is handled by notifyParkDeltaOnDriveStart().
   }
 
   /**
@@ -509,6 +580,7 @@ export class MqttService {
       this.state.updateVersion = persisted.updateVersion;
       this.state.lastUpdateNotifyTime = persisted.lastUpdateNotifyTime;
       this.state.lastParkStart = persisted.lastParkStart || null;
+      this.state.lastParkNotifyTime = persisted.lastParkNotifyTime || 0;
 
       console.log(`已加载持久化状态: ${statePath}`);
       console.log(`  车辆状态: ${this.state.vehicleState || '(无)'}`);
@@ -522,6 +594,11 @@ export class MqttService {
       if (this.state.lastParkStart) {
         console.log(
           `  停车开始: ${new Date(this.state.lastParkStart.timestamp).toLocaleString()} rated=${this.state.lastParkStart.rated_range_km ?? 'n/a'}km usable=${this.state.lastParkStart.usable_battery_level ?? 'n/a'}%`
+        );
+      }
+      if (this.state.lastParkNotifyTime) {
+        console.log(
+          `  停车推送: ${new Date(this.state.lastParkNotifyTime).toLocaleString()}`
         );
       }
     } catch (error) {
@@ -550,6 +627,7 @@ export class MqttService {
       updateVersion: this.state.updateVersion,
       lastUpdateNotifyTime: this.state.lastUpdateNotifyTime,
       lastParkStart: this.state.lastParkStart,
+      lastParkNotifyTime: this.state.lastParkNotifyTime,
       lastUpdated: Date.now(),
     };
 
