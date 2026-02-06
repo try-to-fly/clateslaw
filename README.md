@@ -2,6 +2,11 @@
 
 基于 TeslaMate 的 Tesla 数据服务 CLI 工具，为 [OpenClaw](https://github.com/anthropics/openclaw) 提供 Tesla 车辆数据查询能力。
 
+## Dev workflow (note)
+
+- Do not commit/push after every small change.
+- Batch changes locally; only commit/push when the user explicitly asks to submit/push.
+
 ## 核心用途
 
 本项目主要作为 OpenClaw 的 Skill 使用，通过自然语言与 AI 交互查询 Tesla 车辆数据：

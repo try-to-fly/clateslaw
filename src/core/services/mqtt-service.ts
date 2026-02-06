@@ -15,6 +15,7 @@ import { SLEEP_STATES } from '../../types/mqtt.js';
 import { getMessageService } from './message-service.js';
 import { getGrafanaClient } from '../index.js';
 import { ProjectedRangeService } from './projected-range-service.js';
+import { recommendAroundAndFormat, distanceMeters } from '../utils/amap-recommend.js';
 
 const execAsync = promisify(exec);
 
@@ -48,6 +49,8 @@ export class MqttService {
     lastUpdateNotifyTime: 0,
     lastParkStart: null,
     lastParkNotifyTime: 0,
+    lastParkRecommendCenter: null,
+    lastParkRecommendTime: 0,
   };
 
   private lastRatedRangeKm: number | null = null;
@@ -214,6 +217,7 @@ export class MqttService {
     // 行程结束: driving -> 其他状态
     if (prevState === 'driving' && newState !== 'driving') {
       this.triggerDriveScreenshot();
+      this.triggerParkRecommend();
     }
 
     this.schedulePersist();
@@ -251,6 +255,69 @@ export class MqttService {
         console.log('行程截图完成');
       } catch (error) {
         console.error('行程截图失败:', error instanceof Error ? error.message : error);
+      }
+    }, TRIGGER_DELAY_MS);
+  }
+
+  private triggerParkRecommend(): void {
+    const now = Date.now();
+
+    const minMs = Number(process.env.PARK_RECOMMEND_MIN_MS ?? String(30 * 60 * 1000));
+    if (this.state.lastParkRecommendTime && now - this.state.lastParkRecommendTime < minMs) {
+      console.log('停车周边推荐在最小间隔内，跳过');
+      return;
+    }
+
+    console.log(`检测到停车，${TRIGGER_DELAY_MS / 1000} 秒后查询周边并推送...`);
+    setTimeout(async () => {
+      try {
+        const carId = this.options.carId;
+        const client = getGrafanaClient();
+
+        // Use the last drive's last point as the park center.
+        const { DriveService } = await import('./drive-service.js');
+        const driveService = new DriveService(client);
+        const drives = await driveService.getDrives(carId, { from: 'now-3d', to: 'now', limit: 1 });
+        const lastDrive = drives[0];
+        if (!lastDrive) {
+          console.log('未找到最近行程，跳过周边推荐');
+          return;
+        }
+
+        const positions = await driveService.getDrivePositions(carId, lastDrive.id);
+        const lastPos = positions.length ? positions[positions.length - 1] : null;
+        if (!lastPos) {
+          console.log('最近行程没有轨迹点，跳过周边推荐');
+          return;
+        }
+
+        const center = { latitude: lastPos.latitude, longitude: lastPos.longitude };
+
+        const minMoveMeters = Number(process.env.PARK_RECOMMEND_MIN_MOVE_METERS ?? '1000');
+        if (this.state.lastParkRecommendCenter) {
+          const moved = distanceMeters(this.state.lastParkRecommendCenter, center);
+          if (moved < minMoveMeters) {
+            console.log(`停车位置变化 ${Math.round(moved)}m < ${minMoveMeters}m，跳过推送`);
+            return;
+          }
+        }
+
+        const message = await recommendAroundAndFormat({
+          center,
+          radiusMeters: Number(process.env.AMAP_AROUND_RADIUS ?? '2000'),
+          topN: Number(process.env.AMAP_AROUND_TOPN ?? '3'),
+        });
+
+        const messageService = getMessageService();
+        await messageService.sendText(message);
+
+        this.state.lastParkRecommendCenter = center;
+        this.state.lastParkRecommendTime = Date.now();
+        this.schedulePersist();
+
+        console.log('停车周边推荐已发送');
+      } catch (error) {
+        console.error('停车周边推荐失败:', error instanceof Error ? error.message : error);
       }
     }, TRIGGER_DELAY_MS);
   }
@@ -581,6 +648,8 @@ export class MqttService {
       this.state.lastUpdateNotifyTime = persisted.lastUpdateNotifyTime;
       this.state.lastParkStart = persisted.lastParkStart || null;
       this.state.lastParkNotifyTime = persisted.lastParkNotifyTime || 0;
+      this.state.lastParkRecommendCenter = persisted.lastParkRecommendCenter || null;
+      this.state.lastParkRecommendTime = persisted.lastParkRecommendTime || 0;
 
       console.log(`已加载持久化状态: ${statePath}`);
       console.log(`  车辆状态: ${this.state.vehicleState || '(无)'}`);
@@ -599,6 +668,11 @@ export class MqttService {
       if (this.state.lastParkNotifyTime) {
         console.log(
           `  停车推送: ${new Date(this.state.lastParkNotifyTime).toLocaleString()}`
+        );
+      }
+      if (this.state.lastParkRecommendTime) {
+        console.log(
+          `  周边推荐: ${new Date(this.state.lastParkRecommendTime).toLocaleString()}`
         );
       }
     } catch (error) {
@@ -628,6 +702,8 @@ export class MqttService {
       lastUpdateNotifyTime: this.state.lastUpdateNotifyTime,
       lastParkStart: this.state.lastParkStart,
       lastParkNotifyTime: this.state.lastParkNotifyTime,
+      lastParkRecommendCenter: this.state.lastParkRecommendCenter,
+      lastParkRecommendTime: this.state.lastParkRecommendTime,
       lastUpdated: Date.now(),
     };
 

@@ -41,6 +41,10 @@ export interface StateTracker {
   lastUpdateNotifyTime: number;
   lastParkStart: ParkingSnapshot | null;
   lastParkNotifyTime: number;
+
+  // Location-aware "park recommendation" push control
+  lastParkRecommendCenter: { latitude: number; longitude: number } | null;
+  lastParkRecommendTime: number;
 }
 
 export interface PersistedMqttState {
@@ -56,6 +60,10 @@ export interface PersistedMqttState {
   lastUpdateNotifyTime: number;
   lastParkStart: ParkingSnapshot | null;
   lastParkNotifyTime: number;
+
+  lastParkRecommendCenter: { latitude: number; longitude: number } | null;
+  lastParkRecommendTime: number;
+
   lastUpdated: number;
 }
 
