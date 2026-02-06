@@ -138,10 +138,18 @@ brew install mosquitto
 mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/rated_battery_range_km -m "300"
 mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/usable_battery_level -m "80"
 
-# 2) 模拟开始驾驶（触发：非driving -> driving）
+# 2) 模拟开始驾驶（触发：非driving -> driving，会推送“🚗 开始驾驶/待机变化”）
 mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/state -m "driving"
 
-# 3) 可选：模拟结束驾驶（触发：driving -> 非driving，会走行程截图逻辑并记录停车起点）
+# 3) 模拟结束驾驶/进入停车（触发：driving -> 非driving，会在 30s 后执行并推送 drive 截图）
+mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/state -m "online"
+
+# 4) 典型测试流程（从停车到开始驾驶，再到结束驾驶截图）
+# - 先确保当前不是 driving（例如 online）
+# - 推送开始驾驶（driving）
+# - 再推送结束驾驶（online），等待 30 秒看截图
+mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/state -m "online"
+mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/state -m "driving"
 mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/state -m "online"
 ```
 
