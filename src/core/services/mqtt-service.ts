@@ -168,7 +168,7 @@ export class MqttService {
     }
   }
 
-  private handleVehicleStateChange(newState: VehicleState): void {
+  private async handleVehicleStateChange(newState: VehicleState): Promise<void> {
     const prevState = this.state.vehicleState;
     this.state.vehicleState = newState;
 
