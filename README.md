@@ -115,6 +115,39 @@ AI 可以调用 `tesla_query` 工具执行结构化查询：
 - `detail.drive` - 行程详情（需要 recordId）
 - `detail.charge` - 充电详情（需要 recordId）
 
+## MQTT 模拟（用于测试停车->驾驶推送）
+
+如果你需要在不实际开车的情况下模拟 TeslaMate 的 MQTT 事件，可以用 `mosquitto_pub` 发布消息。
+
+前提：确认 `tesla-mqtt` 进程日志里的配置（Broker/CarId/TopicPrefix），例如：
+
+- Broker: `192.168.31.56:1883`
+- Topic Prefix: `teslamate`
+- Car ID: `1`
+
+安装（macOS/Homebrew）：
+
+```bash
+brew install mosquitto
+```
+
+常用模拟命令：
+
+```bash
+# 1) 可选：先写入续航/电量（让推送里有数字）
+mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/rated_battery_range_km -m "300"
+mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/usable_battery_level -m "80"
+
+# 2) 模拟开始驾驶（触发：非driving -> driving）
+mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/state -m "driving"
+
+# 3) 可选：模拟结束驾驶（触发：driving -> 非driving，会走行程截图逻辑并记录停车起点）
+mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/state -m "online"
+```
+
+注意：停车->驾驶推送的“最小 1 小时间隔”是对“推送频率”的节流（距离上次推送 >= 1h 才允许再次推送），
+不是对“停车时长”的限制；停车时长 29 分钟也可能推送（只要距离上次推送已超过 1 小时，且续航/电量有变化）。
+
 ## 功能特性
 
 - 🚗 车辆信息查询
