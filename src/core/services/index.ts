@@ -10,6 +10,7 @@ export { UpdateService } from './update-service.js';
 export { MileageService } from './mileage-service.js';
 export { VampireService } from './vampire-service.js';
 export { LocationService } from './location-service.js';
+export { PositionService } from './position-service.js';
 export { TimelineService } from './timeline-service.js';
 export { ProjectedRangeService } from './projected-range-service.js';
 export { TPMSService } from './tpms-service.js';

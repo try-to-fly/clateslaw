@@ -120,11 +120,34 @@ AI 可以调用 `tesla_query` 工具执行结构化查询：
 - `detail.drive` - 行程详情（需要 recordId）
 - `detail.charge` - 充电详情（需要 recordId）
 
-## MQTT 模拟（用于测试停车->驾驶推送）
+## 快速查询当前位置（最新定位点）
 
-如果你需要在不实际开车的情况下模拟 TeslaMate 的 MQTT 事件，可以用 `mosquitto_pub` 发布消息。
+新增命令：`tesla where <car-id>`
 
-前提：确认 `tesla-mqtt` 进程日志里的配置（Broker/CarId/TopicPrefix），例如：
+- 经纬度（JSON）：
+  - `tesla where 1 -o json`
+- 经纬度 + 高德逆地理地址：
+  - `tesla where 1 --amap`
+
+### 发送静态地图到 Telegram（Media）
+
+如果你想把“当前坐标”的高德静态地图发到 Telegram，可以用 OpenClaw CLI：
+
+```bash
+openclaw message send \
+  --channel telegram \
+  --target <你的telegram-id> \
+  --media /absolute/path/to/amap-static.png \
+  --message "高德静态地图（最新坐标点）"
+```
+
+> 说明：这里的 `--media` 支持本地文件路径（图片/视频等）。
+
+## MQTT 模拟（用于测试推送逻辑）
+
+如果你需要在不实际开车/不等真实车辆事件的情况下模拟 TeslaMate 的 MQTT 事件，可以用 `mosquitto_pub` 发布消息。
+
+前提：先确认 `tesla-mqtt` 进程日志里的配置（Broker/CarId/TopicPrefix），例如：
 
 - Broker: `192.168.31.56:1883`
 - Topic Prefix: `teslamate`
@@ -135,6 +158,8 @@ AI 可以调用 `tesla_query` 工具执行结构化查询：
 ```bash
 brew install mosquitto
 ```
+
+### 1) 模拟停车->驾驶推送
 
 常用模拟命令：
 
@@ -160,6 +185,35 @@ mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/state -m "online"
 
 注意：停车->驾驶推送的“最小 1 小时间隔”是对“推送频率”的节流（距离上次推送 >= 1h 才允许再次推送），
 不是对“停车时长”的限制；停车时长 29 分钟也可能推送（只要距离上次推送已超过 1 小时，且续航/电量有变化）。
+
+### 2) 模拟软件更新推送
+
+更新推送触发条件（代码逻辑）：
+
+- 需要同时满足：
+  - `update_available = true`
+  - `update_version` 为非空字符串
+- 会立即推送一次，然后 4 小时内（`UPDATE_NOTIFY_INTERVAL_MS`）重复事件会被跳过（避免刷屏）
+
+模拟命令（建议先发 version 再发 available）：
+
+```bash
+# 1) 触发一次“更新可用”推送（确保 update_version 非空）
+mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/update_version -m "2099.99.1"
+mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/update_available -m "true"
+
+# 2) 测试完成后：回退/清理测试状态（避免污染持久化 mqtt-state.json）
+# - 把 update_available 置回 false
+# - 把 update_version 置空
+mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/update_available -m "false"
+mosquitto_pub -h 192.168.31.56 -p 1883 -t teslamate/cars/1/update_version -m ""
+```
+
+如果发现触发后没有推送，优先看 `pm2 logs tesla-mqtt` 是否出现：
+
+- `更新版本: ... -> ...`
+- `更新可用状态: false -> true`
+- `更新通知已发送`（或 `更新通知在 4 小时间隔内，跳过`）
 
 ## 功能特性
 

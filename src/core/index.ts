@@ -13,6 +13,7 @@ import {
   MileageService,
   VampireService,
   LocationService,
+  PositionService,
   TimelineService,
   ProjectedRangeService,
   TPMSService,

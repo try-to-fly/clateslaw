@@ -216,6 +216,10 @@ export class MqttService {
 
     // 行程结束: driving -> 其他状态
     if (prevState === 'driving' && newState !== 'driving') {
+      // 用 MQTT 的 rated_battery_range_km / usable_battery_level 记录一次最新“停车起点”
+      // 避免后续上线通知用到很久以前的 offline 基准，导致待机变化被放大。
+      this.markParkStart();
+
       this.triggerDriveScreenshot();
       this.triggerParkRecommend();
     }

@@ -19,6 +19,7 @@ import { screenshotCommand } from './commands/screenshot.js';
 import { mqttCommand } from './commands/mqtt.js';
 import { queryCommandDef } from './commands/query.js';
 import { tpmsCommand } from './commands/tpms.js';
+import { whereCommand } from './commands/where.js';
 
 const program = new Command();
 
@@ -148,6 +149,14 @@ program
   .option('-f, --from <date>', 'Start time', 'now-30d')
   .option('-t, --to <date>', 'End time', 'now')
   .action(tpmsCommand);
+
+program
+  .command('where <car-id>')
+  .description('Get latest known position (lat/lng)')
+  .option('-o, --output <format>', 'Output format: table | json', 'table')
+  .option('--amap', 'Reverse geocode with AMap (requires AMP_WEB_API)')
+  .option('--radius <meters>', 'AMap reverse geocode radius', '200')
+  .action(whereCommand);
 
 program.addCommand(statsCommand);
 program.addCommand(detailCommand);

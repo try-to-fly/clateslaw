@@ -1,4 +1,4 @@
-import { DEFAULT_TYPECODES, type CategoryKey } from './amap-poi-types.ts';
+import { DEFAULT_TYPECODES, type CategoryKey } from './amap-poi-types.js';
 
 const AMAP_AROUND_URL = 'https://restapi.amap.com/v5/place/around';
 
