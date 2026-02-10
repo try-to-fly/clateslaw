@@ -143,21 +143,72 @@ openclaw message send \
 
 > 说明：这里的 `--media` 支持本地文件路径（图片/视频等）。
 
-## MQTT 模拟（用于测试推送逻辑）
+## MQTT 服务
 
-如果你需要在不实际开车/不等真实车辆事件的情况下模拟 TeslaMate 的 MQTT 事件，可以用 `mosquitto_pub` 发布消息。
+MQTT 服务订阅 TeslaMate 的 MQTT 消息，实现车辆状态变化的实时推送通知。
 
-前提：先确认 `tesla-mqtt` 进程日志里的配置（Broker/CarId/TopicPrefix），例如：
+### 核心事件
 
-- Broker: `192.168.31.56:1883`
-- Topic Prefix: `teslamate`
-- Car ID: `1`
+| 事件 | 触发条件 | 动作 |
+|------|----------|------|
+| 软件更新 | `update_available=true` + `update_version` | 推送更新通知（4小时间隔） |
+| 行程结束 | `driving → 非driving` | 截图 + 周边推荐 + 记录停车起点 |
+| 开始充电 | `非Charging → Charging` | 记录充电起点 |
+| 充电结束 | `Charging → Complete/Disconnected` | 推送充电增益 + 截图 |
+| 开始驾驶 | `非driving → driving` | 推送停车待机变化（不含充电增益） |
 
-安装（macOS/Homebrew）：
+### 差值计算逻辑
+
+**场景示例：驾驶 → 停车 → 充电 → 停车 → 驾驶**
+
+1. `driving → online`: 记录停车起点 300km/70%
+2. `Charging`: 记录充电起点 300km/70%
+3. `Complete`: 推送充电增益 +120km/+25%，更新停车起点为 420km/95%
+4. 停车待机，续航降到 418km/94%
+5. `online → driving`: 推送待机变化 -2km/-1%（只计算充电后的损耗）
+
+### 测试脚本
+
+使用 `scripts/mqtt-test.sh` 快速模拟各种状态变化：
 
 ```bash
-brew install mosquitto
+# 查看帮助
+./scripts/mqtt-test.sh
+
+# 模拟完整行程周期 (driving -> online)
+./scripts/mqtt-test.sh drive-cycle
+
+# 模拟充电周期 (Charging -> Complete)
+./scripts/mqtt-test.sh charge-cycle
+
+# 模拟完整周期 (驾驶->停车->充电->驾驶)
+./scripts/mqtt-test.sh full-cycle
+
+# 模拟软件更新通知
+./scripts/mqtt-test.sh update
+
+# 单独设置续航值
+./scripts/mqtt-test.sh range 350 80
+
+# 单独设置车辆状态
+./scripts/mqtt-test.sh state online
+
+# 单独设置充电状态
+./scripts/mqtt-test.sh charging Charging
 ```
+
+环境变量配置：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `MQTT_HOST` | 127.0.0.1 | MQTT 服务器地址 |
+| `MQTT_PORT` | 1883 | MQTT 端口 |
+| `MQTT_PREFIX` | teslamate | Topic 前缀 |
+| `CAR_ID` | 1 | 车辆 ID |
+
+### 手动 MQTT 模拟（mosquitto_pub）
+
+如果你需要在不实际开车/不等真实车辆事件的情况下模拟 TeslaMate 的 MQTT 事件，可以用 `mosquitto_pub` 发布消息。
 
 ### 1) 模拟停车->驾驶推送
 

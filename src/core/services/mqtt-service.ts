@@ -7,21 +7,17 @@ import type {
   VehicleState,
   ChargingState,
   StateTracker,
-  RangeSnapshot,
   PersistedMqttState,
   ParkingSnapshot,
 } from '../../types/mqtt.js';
-import { SLEEP_STATES } from '../../types/mqtt.js';
 import { getMessageService } from './message-service.js';
 import { getGrafanaClient } from '../index.js';
-import { ProjectedRangeService } from './projected-range-service.js';
 import { recommendAroundAndFormat, distanceMeters } from '../utils/amap-recommend.js';
 
 const execAsync = promisify(exec);
 
 const DEBOUNCE_MS = 60 * 1000; // 60 秒防抖
 const TRIGGER_DELAY_MS = 30 * 1000; // 30 秒延迟等待数据入库
-const ONLINE_NOTIFY_DELAY_MS = 5 * 1000; // 5 秒延迟发送上线通知
 const PERSIST_DEBOUNCE_MS = 5 * 1000; // 5 秒防抖持久化
 const UPDATE_NOTIFY_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 小时更新通知间隔
 const PARK_NOTIFY_MIN_MS = 60 * 60 * 1000; // 停车->驾驶推送最小间隔（默认 1h）
@@ -41,14 +37,12 @@ export class MqttService {
     chargingState: null,
     lastDriveTrigger: 0,
     lastChargeTrigger: 0,
-    lastOfflineRange: null,
-    lastOnlineTrigger: 0,
-    sleepStartTime: null,
     updateAvailable: false,
     updateVersion: null,
     lastUpdateNotifyTime: 0,
     lastParkStart: null,
     lastParkNotifyTime: 0,
+    lastChargeStart: null,
     lastParkRecommendCenter: null,
     lastParkRecommendTime: 0,
   };
@@ -177,51 +171,17 @@ export class MqttService {
 
     console.log(`车辆状态: ${prevState || '(初始化)'} -> ${newState}`);
 
-    // Track park window boundaries:
-    // - driving -> non-driving: mark park start snapshot once per park window
-    // - non-driving -> driving: compute and notify (with min interval)
-    //
-    // A "park window" can include multiple intermediate states (online/charging/asleep/etc).
-    // We want the *first* transition out of driving to define the window start.
+    // 事件 2: driving → 非driving (行程结束)
     if (prevState === 'driving' && newState !== 'driving') {
-      if (!this.state.lastParkStart) {
-        this.markParkStart();
-      } else {
-        console.log('ParkStart 已存在（仍在停车窗口内），不重复记录');
-      }
+      this.markParkStart();           // 记录停车起点
+      this.triggerDriveScreenshot();  // 行程截图
+      this.triggerParkRecommend();    // 周边推荐
     }
+
+    // 事件 4: 非driving → driving (开始驾驶)
     if (prevState && prevState !== 'driving' && newState === 'driving') {
-      await this.notifyParkDeltaOnDriveStart();
-      this.logParkLoss('drive_start');
-    }
-
-    const wasSleeping = prevState && SLEEP_STATES.includes(prevState);
-    const isSleeping = SLEEP_STATES.includes(newState);
-
-    // 进入休眠状态时记录时间
-    if (!wasSleeping && isSleeping) {
-      this.state.sleepStartTime = Date.now();
-      console.log('车辆进入休眠状态');
-    }
-
-    // 进入 offline 时记录当前续航
-    if (newState === 'offline' && prevState !== 'offline') {
-      this.captureOfflineRange();
-    }
-
-    // 从休眠状态唤醒时发送上线通知
-    if (wasSleeping && !isSleeping) {
-      this.triggerOnlineNotification();
-    }
-
-    // 行程结束: driving -> 其他状态
-    if (prevState === 'driving' && newState !== 'driving') {
-      // 用 MQTT 的 rated_battery_range_km / usable_battery_level 记录一次最新“停车起点”
-      // 避免后续上线通知用到很久以前的 offline 基准，导致待机变化被放大。
-      this.markParkStart();
-
-      this.triggerDriveScreenshot();
-      this.triggerParkRecommend();
+      await this.notifyParkDeltaOnDriveStart();  // 推送续航变化
+      this.logParkLoss('drive_start');           // 记录日志
     }
 
     this.schedulePersist();
@@ -233,9 +193,15 @@ export class MqttService {
 
     console.log(`充电状态: ${prevState || '(初始化)'} -> ${newState}`);
 
+    // 开始充电: 记录充电起点
+    if (newState === 'Charging' && prevState !== 'Charging') {
+      this.markChargeStart();
+    }
+
     // 充电结束: Charging -> Complete 或 Disconnected
     if (prevState === 'Charging' && (newState === 'Complete' || newState === 'Disconnected')) {
-      this.triggerChargeScreenshot();
+      this.notifyChargeDelta();       // 推送充电增益
+      this.triggerChargeScreenshot(); // 充电截图
     }
 
     this.schedulePersist();
@@ -348,82 +314,6 @@ export class MqttService {
     }, TRIGGER_DELAY_MS);
   }
 
-  /**
-   * 记录进入 offline 时的续航数据
-   */
-  private async captureOfflineRange(): Promise<void> {
-    try {
-      const client = getGrafanaClient();
-      const rangeService = new ProjectedRangeService(client);
-      const stats = await rangeService.getProjectedRangeStats(this.options.carId);
-
-      this.state.lastOfflineRange = {
-        range_km: Math.round(stats.projected_range * stats.avg_usable_battery_level / 100),
-        battery_level: Math.round(stats.avg_usable_battery_level),
-        timestamp: Date.now(),
-      };
-
-      console.log(`已记录 offline 续航: ${this.state.lastOfflineRange.range_km} km (${this.state.lastOfflineRange.battery_level}%)`);
-    } catch (error) {
-      console.error('记录 offline 续航失败:', error instanceof Error ? error.message : error);
-    }
-  }
-
-  /**
-   * 触发上线通知（带防抖）
-   */
-  private triggerOnlineNotification(): void {
-    const now = Date.now();
-    if (now - this.state.lastOnlineTrigger < DEBOUNCE_MS) {
-      console.log('上线通知触发被防抖，跳过');
-      return;
-    }
-    this.state.lastOnlineTrigger = now;
-
-    console.log(`车辆上线，${ONLINE_NOTIFY_DELAY_MS / 1000} 秒后发送通知...`);
-    setTimeout(() => this.sendOnlineNotification(), ONLINE_NOTIFY_DELAY_MS);
-  }
-
-  /**
-   * 发送上线通知
-   */
-  private async sendOnlineNotification(): Promise<void> {
-    try {
-      const client = getGrafanaClient();
-      const rangeService = new ProjectedRangeService(client);
-      const stats = await rangeService.getProjectedRangeStats(this.options.carId);
-
-      const currentRange = Math.round(stats.projected_range * stats.avg_usable_battery_level / 100);
-      const currentLevel = Math.round(stats.avg_usable_battery_level);
-
-      let message = `🚗 车辆已上线\n当前续航: ${currentRange} km (${currentLevel}%)`;
-
-      // 添加休眠时长
-      if (this.state.sleepStartTime) {
-        const sleepDuration = Date.now() - this.state.sleepStartTime;
-        message += `\n休眠时长: ${this.formatDuration(sleepDuration)}`;
-        this.state.sleepStartTime = null;
-      }
-
-      // 如果有 offline 时的记录，计算待机变化（上涨/下跌都展示；完全不变则省略）
-      if (this.state.lastOfflineRange) {
-        const rangeDelta = currentRange - this.state.lastOfflineRange.range_km;
-        const levelDelta = currentLevel - this.state.lastOfflineRange.battery_level;
-
-        if (rangeDelta !== 0 || levelDelta !== 0) {
-          const fmt = (n: number) => (n > 0 ? `+${n}` : `${n}`);
-          message += `\n待机变化: ${fmt(rangeDelta)} km (${fmt(levelDelta)}%)`;
-        }
-      }
-
-      const messageService = getMessageService();
-      await messageService.sendText(message);
-      console.log('上线通知已发送');
-    } catch (error) {
-      console.error('发送上线通知失败:', error instanceof Error ? error.message : error);
-    }
-  }
-
   private handleRatedRange(message: string): void {
     const parsed = Number(message);
     if (Number.isFinite(parsed)) {
@@ -459,6 +349,66 @@ export class MqttService {
     console.log(
       `ParkStart: rated=${r ?? 'n/a'}km usable=${l ?? 'n/a'}%`
     );
+  }
+
+  private markChargeStart(): void {
+    this.state.lastChargeStart = this.currentParkingSnapshot();
+
+    const r = this.state.lastChargeStart.rated_range_km;
+    const l = this.state.lastChargeStart.usable_battery_level;
+    console.log(
+      `ChargeStart: rated=${r ?? 'n/a'}km usable=${l ?? 'n/a'}%`
+    );
+  }
+
+  private async notifyChargeDelta(): Promise<void> {
+    if (!this.state.lastChargeStart) {
+      console.log('无充电起点记录，跳过充电增益推送');
+      // 仍然更新 lastParkStart，以便后续停车损耗计算正确
+      this.markParkStart();
+      return;
+    }
+
+    const start = this.state.lastChargeStart;
+    const end = this.currentParkingSnapshot();
+    const dtMs = end.timestamp - start.timestamp;
+
+    const rangeDelta =
+      start.rated_range_km != null && end.rated_range_km != null
+        ? Math.round((end.rated_range_km - start.rated_range_km) * 10) / 10
+        : null;
+
+    const levelDelta =
+      start.usable_battery_level != null && end.usable_battery_level != null
+        ? Math.round((end.usable_battery_level - start.usable_battery_level) * 10) / 10
+        : null;
+
+    // 充电增益为 0 或负数时省略推送
+    if ((rangeDelta === null || rangeDelta <= 0) && (levelDelta === null || levelDelta <= 0)) {
+      console.log('充电增益为 0 或负数，省略推送');
+    } else {
+      try {
+        let message = `🔋 充电完成`;
+        message += `\n充电时长: ${this.formatDuration(dtMs)}`;
+
+        if (rangeDelta != null || levelDelta != null) {
+          const r = rangeDelta != null ? this.fmtDelta(rangeDelta) : 'n/a';
+          const l = levelDelta != null ? this.fmtDelta(levelDelta) : 'n/a';
+          message += `\n充电增益: ${r} km (${l}%)`;
+        }
+
+        const messageService = getMessageService();
+        await messageService.sendText(message);
+        console.log('充电增益推送已发送');
+      } catch (error) {
+        console.error('发送充电增益推送失败:', error instanceof Error ? error.message : error);
+      }
+    }
+
+    // 充电结束后更新 lastParkStart，这样开始驾驶时只计算充电后的停车损耗
+    this.markParkStart();
+    this.state.lastChargeStart = null;
+    this.schedulePersist();
   }
 
   private fmtDelta(n: number): string {
@@ -644,29 +594,29 @@ export class MqttService {
       this.state.chargingState = persisted.chargingState;
       this.state.lastDriveTrigger = persisted.lastDriveTrigger;
       this.state.lastChargeTrigger = persisted.lastChargeTrigger;
-      this.state.lastOfflineRange = persisted.lastOfflineRange;
-      this.state.lastOnlineTrigger = persisted.lastOnlineTrigger;
-      this.state.sleepStartTime = persisted.sleepStartTime;
       this.state.updateAvailable = persisted.updateAvailable;
       this.state.updateVersion = persisted.updateVersion;
       this.state.lastUpdateNotifyTime = persisted.lastUpdateNotifyTime;
       this.state.lastParkStart = persisted.lastParkStart || null;
       this.state.lastParkNotifyTime = persisted.lastParkNotifyTime || 0;
+      this.state.lastChargeStart = persisted.lastChargeStart || null;
       this.state.lastParkRecommendCenter = persisted.lastParkRecommendCenter || null;
       this.state.lastParkRecommendTime = persisted.lastParkRecommendTime || 0;
 
       console.log(`已加载持久化状态: ${statePath}`);
       console.log(`  车辆状态: ${this.state.vehicleState || '(无)'}`);
       console.log(`  充电状态: ${this.state.chargingState || '(无)'}`);
-      if (this.state.sleepStartTime) {
-        console.log(`  休眠开始: ${new Date(this.state.sleepStartTime).toLocaleString()}`);
-      }
       if (this.state.updateAvailable) {
         console.log(`  待更新版本: ${this.state.updateVersion}`);
       }
       if (this.state.lastParkStart) {
         console.log(
           `  停车开始: ${new Date(this.state.lastParkStart.timestamp).toLocaleString()} rated=${this.state.lastParkStart.rated_range_km ?? 'n/a'}km usable=${this.state.lastParkStart.usable_battery_level ?? 'n/a'}%`
+        );
+      }
+      if (this.state.lastChargeStart) {
+        console.log(
+          `  充电开始: ${new Date(this.state.lastChargeStart.timestamp).toLocaleString()} rated=${this.state.lastChargeStart.rated_range_km ?? 'n/a'}km usable=${this.state.lastChargeStart.usable_battery_level ?? 'n/a'}%`
         );
       }
       if (this.state.lastParkNotifyTime) {
@@ -698,14 +648,12 @@ export class MqttService {
       chargingState: this.state.chargingState,
       lastDriveTrigger: this.state.lastDriveTrigger,
       lastChargeTrigger: this.state.lastChargeTrigger,
-      lastOfflineRange: this.state.lastOfflineRange,
-      lastOnlineTrigger: this.state.lastOnlineTrigger,
-      sleepStartTime: this.state.sleepStartTime,
       updateAvailable: this.state.updateAvailable,
       updateVersion: this.state.updateVersion,
       lastUpdateNotifyTime: this.state.lastUpdateNotifyTime,
       lastParkStart: this.state.lastParkStart,
       lastParkNotifyTime: this.state.lastParkNotifyTime,
+      lastChargeStart: this.state.lastChargeStart,
       lastParkRecommendCenter: this.state.lastParkRecommendCenter,
       lastParkRecommendTime: this.state.lastParkRecommendTime,
       lastUpdated: Date.now(),

@@ -15,12 +15,6 @@ export type ChargingState =
   | 'Stopped'
   | 'Starting';
 
-export interface RangeSnapshot {
-  range_km: number;
-  battery_level: number;
-  timestamp: number;
-}
-
 export interface ParkingSnapshot {
   timestamp: number;
   rated_range_km: number | null;
@@ -32,15 +26,12 @@ export interface StateTracker {
   chargingState: ChargingState | null;
   lastDriveTrigger: number;
   lastChargeTrigger: number;
-  lastOfflineRange: RangeSnapshot | null;
-  lastOnlineTrigger: number;
-  // New fields
-  sleepStartTime: number | null;
   updateAvailable: boolean;
   updateVersion: string | null;
   lastUpdateNotifyTime: number;
   lastParkStart: ParkingSnapshot | null;
   lastParkNotifyTime: number;
+  lastChargeStart: ParkingSnapshot | null;
 
   // Location-aware "park recommendation" push control
   lastParkRecommendCenter: { latitude: number; longitude: number } | null;
@@ -52,19 +43,15 @@ export interface PersistedMqttState {
   chargingState: ChargingState | null;
   lastDriveTrigger: number;
   lastChargeTrigger: number;
-  lastOfflineRange: RangeSnapshot | null;
-  lastOnlineTrigger: number;
-  sleepStartTime: number | null;
   updateAvailable: boolean;
   updateVersion: string | null;
   lastUpdateNotifyTime: number;
   lastParkStart: ParkingSnapshot | null;
   lastParkNotifyTime: number;
+  lastChargeStart: ParkingSnapshot | null;
 
   lastParkRecommendCenter: { latitude: number; longitude: number } | null;
   lastParkRecommendTime: number;
 
   lastUpdated: number;
 }
-
-export const SLEEP_STATES: VehicleState[] = ['asleep', 'offline', 'suspended'];
