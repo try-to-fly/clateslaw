@@ -122,7 +122,7 @@ export async function recommendAroundAndFormat(params: {
   topN?: number;
 }): Promise<string> {
   const key = requireEnv('AMP_WEB_API');
-  const radius = params.radiusMeters ?? Number(process.env.AMAP_AROUND_RADIUS ?? '2000');
+  const radius = params.radiusMeters ?? Number(process.env.AMAP_AROUND_RADIUS ?? '3000');
   const topN = Math.max(1, Math.min(3, params.topN ?? 3));
 
   const center = {
@@ -134,13 +134,18 @@ export async function recommendAroundAndFormat(params: {
     { title: '充电', emoji: '⚡', keys: ['charging'], take: topN },
     { title: '停车', emoji: '🅿️', keys: ['parking'], take: topN },
     { title: '美食', emoji: '🍜', keys: ['food'], take: topN },
+    { title: '咖啡', emoji: '☕', keys: ['coffee'], take: topN },
     { title: '便利店', emoji: '🏪', keys: ['convenience'], take: topN },
+    { title: '超市', emoji: '🛒', keys: ['supermarket'], take: topN },
     { title: '商场', emoji: '🏬', keys: ['mall'], take: topN },
+    { title: '洗车', emoji: '🚿', keys: ['carwash'], take: topN },
+    { title: '药店', emoji: '💊', keys: ['pharmacy'], take: topN },
+    { title: '酒店', emoji: '🏨', keys: ['hotel'], take: topN },
     { title: '厕所', emoji: '🚻', keys: ['toilet'], take: topN },
   ];
 
   const lines: string[] = [];
-  lines.push(`📍停车后周边（半径${radius}m）`);
+  lines.push(`📍停车后周边（半径${radius >= 1000 ? `${radius / 1000}km` : `${radius}m`}）`);
 
   const allTypes = Array.from(
     new Set(

@@ -9,7 +9,12 @@ export type CategoryKey =
   | 'food'
   | 'convenience'
   | 'mall'
-  | 'toilet';
+  | 'toilet'
+  | 'coffee'
+  | 'carwash'
+  | 'pharmacy'
+  | 'supermarket'
+  | 'hotel';
 
 // NOTE: Some categories can have multiple relevant typecodes; we search them in one request
 // and then bucket results by typecode prefix match.
@@ -32,8 +37,20 @@ export const DEFAULT_TYPECODES: Record<CategoryKey, string[]> = {
   // 厕所：公共设施->公共厕所；常见码表里 200300 系列
   toilet: ['200300', '200301'],
 
-  // 商场：购物服务->商场；常见码表里 060100 系列
-  // (keep as prefix)
+  // 咖啡厅：餐饮服务->咖啡厅
+  coffee: ['050500'],
+
+  // 洗车场：汽车服务->洗车场
+  carwash: ['010500'],
+
+  // 药店：医药保健销售
+  pharmacy: ['090600'],
+
+  // 超市：购物服务->超级市场
+  supermarket: ['060400'],
+
+  // 酒店：住宿服务
+  hotel: ['100000'],
 };
 
 export const OTHER_BUNDLED: CategoryKey[] = ['convenience', 'mall', 'toilet'];

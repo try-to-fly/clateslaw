@@ -3,7 +3,7 @@ module.exports = {
     {
       name: "tesla-mqtt",
       script: "pnpm",
-      args: "dev mqtt",
+      args: "dev mqtt listen",
       cwd: process.cwd(),
       autorestart: true,
       max_restarts: 10,
