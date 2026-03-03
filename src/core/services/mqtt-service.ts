@@ -13,6 +13,8 @@ import type {
 import { getMessageService } from './message-service.js';
 import { getGrafanaClient } from '../index.js';
 import { recommendAroundAndFormat, distanceMeters } from '../utils/amap-recommend.js';
+import { amapReverseGeocode } from '../utils/amap-regeo.js';
+import { config } from '../../config/index.js';
 
 const execAsync = promisify(exec);
 
@@ -45,6 +47,10 @@ export class MqttService {
     lastChargeStart: null,
     lastParkRecommendCenter: null,
     lastParkRecommendTime: 0,
+
+    lastNavDestination: null,
+    lastNavThresholdNotifiedMinutes: [],
+    lastNavArrivedNotified: false,
   };
 
   private lastRatedRangeKm: number | null = null;
@@ -124,6 +130,8 @@ export class MqttService {
       // TeslaMate MQTT: rated range + usable battery percent for park-loss tracking
       `${topicPrefix}/cars/${carId}/rated_battery_range_km`,
       `${topicPrefix}/cars/${carId}/usable_battery_level`,
+      // TeslaMate MQTT: navigation (active route)
+      `${topicPrefix}/cars/${carId}/active_route`,
     ];
 
     topics.forEach((topic) => {
@@ -145,6 +153,7 @@ export class MqttService {
     const updateVersionTopic = `${topicPrefix}/cars/${carId}/update_version`;
     const ratedRangeTopic = `${topicPrefix}/cars/${carId}/rated_battery_range_km`;
     const usableBatteryTopic = `${topicPrefix}/cars/${carId}/usable_battery_level`;
+    const activeRouteTopic = `${topicPrefix}/cars/${carId}/active_route`;
 
     if (process.env.MQTT_DEBUG === '1') {
       console.log(`[mqtt] ${topic} = ${message}`);
@@ -162,6 +171,8 @@ export class MqttService {
       this.handleRatedRange(message);
     } else if (topic === usableBatteryTopic) {
       this.handleUsableBatteryLevel(message);
+    } else if (topic === activeRouteTopic) {
+      this.handleActiveRoute(message);
     }
   }
 
@@ -327,6 +338,176 @@ export class MqttService {
     if (Number.isFinite(parsed)) {
       // TeslaMate provides a float; we keep a 0.1% precision.
       this.lastUsableBatteryLevel = Math.round(parsed * 10) / 10;
+    }
+  }
+
+  private shouldNavNotifyForDestination(destination: string): boolean {
+    const keywords = config.navAlert.destinationKeywords;
+    if (!config.navAlert.enabled) return false;
+    if (!keywords.length) return false;
+
+    return keywords.some((k) => destination.includes(k));
+  }
+
+  private async handleActiveRoute(message: string): Promise<void> {
+    // TeslaMate publishes JSON as a single MQTT message.
+    // Example:
+    // {"error":null,"location":{"latitude":...},"destination":"...","miles_to_arrival":...,"minutes_to_arrival":...}
+    let parsed: any;
+    try {
+      parsed = JSON.parse(message);
+    } catch {
+      if (process.env.MQTT_DEBUG === '1') {
+        console.log('[nav] active_route parse failed');
+      }
+      return;
+    }
+
+    const destination = typeof parsed?.destination === 'string' ? parsed.destination : null;
+    const minutesToArrival = typeof parsed?.minutes_to_arrival === 'number' ? parsed.minutes_to_arrival : null;
+    const milesToArrival = typeof parsed?.miles_to_arrival === 'number' ? parsed.miles_to_arrival : null;
+    const loc = parsed?.location;
+    const lat = typeof loc?.latitude === 'number' ? loc.latitude : null;
+    const lng = typeof loc?.longitude === 'number' ? loc.longitude : null;
+
+    // No active route (or route error) => reset nav state.
+    if (!destination || minutesToArrival == null || parsed?.error) {
+      if (process.env.MQTT_DEBUG === '1') {
+        console.log('[nav] inactive route -> reset');
+      }
+      // If we had an active route and haven't sent arrival yet, treat this as arrival.
+      if (this.state.lastNavDestination && !this.state.lastNavArrivedNotified) {
+        try {
+          const messageService = getMessageService();
+          let text = `✅ 已到达`;
+          text += `\n目的地: ${this.state.lastNavDestination}`;
+          await messageService.sendText(text);
+          this.state.lastNavArrivedNotified = true;
+          console.log(`[nav] sent(arrived): ${this.state.lastNavDestination} (route ended)`);
+        } catch (error) {
+          console.error('发送到达推送失败:', error instanceof Error ? error.message : error);
+        }
+      }
+
+      if (this.state.lastNavDestination || this.state.lastNavThresholdNotifiedMinutes.length) {
+        this.state.lastNavDestination = null;
+        this.state.lastNavThresholdNotifiedMinutes = [];
+        this.state.lastNavArrivedNotified = false;
+        this.schedulePersist();
+      }
+      return;
+    }
+
+    if (!this.shouldNavNotifyForDestination(destination)) {
+      if (process.env.MQTT_DEBUG === '1') {
+        console.log(`[nav] destination not matched -> reset (destination=${destination})`);
+      }
+      // Destination does not match; reset so next time matching route starts, it can notify immediately.
+      if (this.state.lastNavDestination || this.state.lastNavThresholdNotifiedMinutes.length) {
+        this.state.lastNavDestination = null;
+        this.state.lastNavThresholdNotifiedMinutes = [];
+        this.state.lastNavArrivedNotified = false;
+        this.schedulePersist();
+      }
+      return;
+    }
+
+    const now = Date.now();
+
+    // Reset per-route state when destination changes.
+    if (this.state.lastNavDestination !== destination) {
+      if (process.env.MQTT_DEBUG === '1') {
+        console.log(`[nav] destination changed: ${this.state.lastNavDestination || '(none)'} -> ${destination}`);
+      }
+      this.state.lastNavDestination = destination;
+      this.state.lastNavThresholdNotifiedMinutes = [];
+      this.state.lastNavArrivedNotified = false;
+      this.schedulePersist();
+    }
+
+    const minutes = Math.max(0, Math.round(minutesToArrival));
+    const distKm = milesToArrival != null ? Math.round(milesToArrival * 1.609344 * 10) / 10 : null;
+
+    let locStr = lat != null && lng != null ? `${lat.toFixed(5)},${lng.toFixed(5)}` : 'n/a';
+
+    // Prefer existing AMap key env used elsewhere in this project.
+    const amapKey =
+      config.navAlert.amapKey ||
+      process.env.AMP_WEB_API ||
+      process.env.AMAP_WEB_API ||
+      process.env.AMAP_KEY ||
+      process.env.VITE_AMAP_KEY ||
+      '';
+
+    if (amapKey && lat != null && lng != null) {
+      try {
+        const regeo = await amapReverseGeocode({
+          key: amapKey,
+          lat,
+          lng,
+          radius: 200,
+        });
+        // Short human-readable address.
+        const parts = [regeo.district, regeo.township, regeo.neighborhood]
+          .filter((v) => typeof v === 'string' && v.trim());
+        if (parts.length) locStr = parts.join('');
+        else if (regeo.formatted_address) locStr = regeo.formatted_address;
+      } catch {
+        if (process.env.MQTT_DEBUG === '1') {
+          console.log('[nav] regeo failed, fallback to lat,lng');
+        }
+      }
+    }
+
+    const thresholds = [...new Set(config.navAlert.thresholdsMinutes)]
+      .filter((n) => Number.isFinite(n) && n >= 0)
+      .sort((a, b) => b - a);
+
+    const messageService = getMessageService();
+
+    // Threshold-based pushes: 15/10/5 ... (send once when crossing).
+    for (const t of thresholds) {
+      if (minutes <= t && !this.state.lastNavThresholdNotifiedMinutes.includes(t)) {
+        let text = `🧭 导航提醒`;
+        text += `\n目的地: ${destination}`;
+        text += `\n当前位置: ${locStr}`;
+        text += `\n剩余: ${minutes} 分钟`;
+        if (distKm != null) text += ` / ${distKm} km`;
+
+        try {
+          if (process.env.MQTT_DEBUG === '1') {
+            console.log(`[nav] threshold hit: ${t} (minutes=${minutes}) -> sending`);
+          }
+          await messageService.sendText(text);
+          this.state.lastNavThresholdNotifiedMinutes.push(t);
+          this.schedulePersist();
+          console.log(`[nav] sent(threshold=${t}): ${destination} (${minutes}min${distKm != null ? `/${distKm}km` : ''})`);
+        } catch (error) {
+          console.error('发送导航推送失败:', error instanceof Error ? error.message : error);
+        }
+
+        // Important: avoid sending multiple thresholds in one MQTT tick.
+        break;
+      }
+    }
+
+    // Arrival push: when minutes reaches 0.
+    if (minutes <= 0 && !this.state.lastNavArrivedNotified) {
+      let text = `✅ 已到达`;
+      text += `\n目的地: ${destination}`;
+      text += `\n当前位置: ${locStr}`;
+
+      try {
+        if (process.env.MQTT_DEBUG === '1') {
+          console.log('[nav] arrived -> sending');
+        }
+        await messageService.sendText(text);
+        this.state.lastNavArrivedNotified = true;
+        this.schedulePersist();
+        console.log(`[nav] sent(arrived): ${destination}`);
+      } catch (error) {
+        console.error('发送到达推送失败:', error instanceof Error ? error.message : error);
+      }
     }
   }
 
@@ -603,6 +784,14 @@ export class MqttService {
       this.state.lastParkRecommendCenter = persisted.lastParkRecommendCenter || null;
       this.state.lastParkRecommendTime = persisted.lastParkRecommendTime || 0;
 
+      this.state.lastNavDestination = persisted.lastNavDestination || null;
+      this.state.lastNavThresholdNotifiedMinutes = Array.isArray(persisted.lastNavThresholdNotifiedMinutes)
+        ? persisted.lastNavThresholdNotifiedMinutes.filter((n) => typeof n === 'number' && Number.isFinite(n))
+        : [];
+      this.state.lastNavArrivedNotified = typeof persisted.lastNavArrivedNotified === 'boolean'
+        ? persisted.lastNavArrivedNotified
+        : false;
+
       console.log(`已加载持久化状态: ${statePath}`);
       console.log(`  车辆状态: ${this.state.vehicleState || '(无)'}`);
       console.log(`  充电状态: ${this.state.chargingState || '(无)'}`);
@@ -656,6 +845,11 @@ export class MqttService {
       lastChargeStart: this.state.lastChargeStart,
       lastParkRecommendCenter: this.state.lastParkRecommendCenter,
       lastParkRecommendTime: this.state.lastParkRecommendTime,
+
+      lastNavDestination: this.state.lastNavDestination,
+      lastNavThresholdNotifiedMinutes: this.state.lastNavThresholdNotifiedMinutes,
+      lastNavArrivedNotified: this.state.lastNavArrivedNotified,
+
       lastUpdated: Date.now(),
     };
 

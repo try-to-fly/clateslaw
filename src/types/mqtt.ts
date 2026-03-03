@@ -36,6 +36,13 @@ export interface StateTracker {
   // Location-aware "park recommendation" push control
   lastParkRecommendCenter: { latitude: number; longitude: number } | null;
   lastParkRecommendTime: number;
+
+  // Navigation push (active_route)
+  lastNavDestination: string | null;
+  // Threshold-based pushes for the current destination.
+  lastNavThresholdNotifiedMinutes: number[];
+  // Arrival message sent for the current destination.
+  lastNavArrivedNotified: boolean;
 }
 
 export interface PersistedMqttState {
@@ -52,6 +59,11 @@ export interface PersistedMqttState {
 
   lastParkRecommendCenter: { latitude: number; longitude: number } | null;
   lastParkRecommendTime: number;
+
+  // Navigation push (active_route)
+  lastNavDestination?: string | null;
+  lastNavThresholdNotifiedMinutes?: number[];
+  lastNavArrivedNotified?: boolean;
 
   lastUpdated: number;
 }

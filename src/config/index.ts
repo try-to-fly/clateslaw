@@ -21,6 +21,7 @@ export const config = (() => {
   const mqtt = stored.mqtt || {};
   const grafana = stored.grafana || {};
   const openclaw = stored.openclaw || {};
+  const navAlert = stored.navAlert || {};
 
   return {
     grafana: {
@@ -37,6 +38,18 @@ export const config = (() => {
       port: optionalNumber(mqtt.port, 1883),
       carId: optionalNumber(mqtt.carId, 1),
       topicPrefix: optionalString(mqtt.topicPrefix, 'teslamate'),
+    },
+    navAlert: {
+      enabled: typeof navAlert.enabled === 'boolean' ? navAlert.enabled : false,
+      destinationKeywords: Array.isArray(navAlert.destinationKeywords)
+        ? navAlert.destinationKeywords.filter((v) => typeof v === 'string' && v.trim())
+        : [],
+      thresholdsMinutes: Array.isArray(navAlert.thresholdsMinutes)
+        ? navAlert.thresholdsMinutes
+            .filter((n) => typeof n === 'number' && Number.isFinite(n))
+            .map((n) => Math.max(0, Math.round(n)))
+        : [15, 10, 5],
+      amapKey: typeof navAlert.amapKey === 'string' && navAlert.amapKey.trim() ? navAlert.amapKey.trim() : undefined,
     },
   } as const;
 })();
