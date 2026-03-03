@@ -462,7 +462,7 @@ export class MqttService {
 
     // Prefer existing AMap key env used elsewhere in this project.
     const amapKey =
-      config.navAlert.amapKey ||
+      config.amap.webApiKey ||
       process.env.AMP_WEB_API ||
       process.env.AMAP_WEB_API ||
       process.env.AMAP_KEY ||

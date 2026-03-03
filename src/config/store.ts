@@ -20,15 +20,17 @@ export type StoredConfig = {
     carId?: number;
     topicPrefix?: string;
   };
+  amap?: {
+    // AMap (Gaode) WebService API key (used by around search / reverse geocode on server side).
+    // Historically this was provided via env AMP_WEB_API.
+    webApiKey?: string;
+  };
   navAlert?: {
     enabled?: boolean;
     // Match if destination includes any keyword.
     destinationKeywords?: string[];
     // Trigger pushes when remaining minutes crosses one of these thresholds.
     thresholdsMinutes?: number[];
-    // AMap (Gaode) Web API key for reverse geocoding the current location.
-    // If omitted, we will fall back to lat,lng in messages.
-    amapKey?: string;
   };
 };
 

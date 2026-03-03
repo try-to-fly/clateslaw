@@ -121,14 +121,16 @@ export async function recommendAroundAndFormat(params: {
   radiusMeters?: number;
   topN?: number;
 }): Promise<string> {
-  // Keep compatibility with existing deployments: prefer AMP_WEB_API, but also accept common AMap key names.
+  // Prefer configstore key; fallback to env for compatibility.
+  const { config } = await import('../../config/index.js');
   const key =
+    config.amap.webApiKey ||
     process.env.AMP_WEB_API ||
     process.env.AMAP_WEB_API ||
     process.env.AMAP_KEY ||
     process.env.VITE_AMAP_KEY ||
     '';
-  if (!key) throw new Error('Missing required AMap key (set AMP_WEB_API or AMAP_WEB_API/AMAP_KEY)');
+  if (!key) throw new Error('Missing required AMap key (set config.amap.webApiKey or AMP_WEB_API)');
   const radius = params.radiusMeters ?? Number(process.env.AMAP_AROUND_RADIUS ?? '3000');
   const topN = Math.max(1, Math.min(3, params.topN ?? 3));
 

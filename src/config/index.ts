@@ -21,6 +21,7 @@ export const config = (() => {
   const mqtt = stored.mqtt || {};
   const grafana = stored.grafana || {};
   const openclaw = stored.openclaw || {};
+  const amap = stored.amap || {};
   const navAlert = stored.navAlert || {};
 
   return {
@@ -39,6 +40,12 @@ export const config = (() => {
       carId: optionalNumber(mqtt.carId, 1),
       topicPrefix: optionalString(mqtt.topicPrefix, 'teslamate'),
     },
+    amap: {
+      webApiKey:
+        typeof amap.webApiKey === 'string' && amap.webApiKey.trim()
+          ? amap.webApiKey.trim()
+          : undefined,
+    },
     navAlert: {
       enabled: typeof navAlert.enabled === 'boolean' ? navAlert.enabled : false,
       destinationKeywords: Array.isArray(navAlert.destinationKeywords)
@@ -49,7 +56,6 @@ export const config = (() => {
             .filter((n) => typeof n === 'number' && Number.isFinite(n))
             .map((n) => Math.max(0, Math.round(n)))
         : [15, 10, 5],
-      amapKey: typeof navAlert.amapKey === 'string' && navAlert.amapKey.trim() ? navAlert.amapKey.trim() : undefined,
     },
   } as const;
 })();
