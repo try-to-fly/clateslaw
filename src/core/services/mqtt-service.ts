@@ -229,6 +229,36 @@ export class MqttService {
     console.log(`行程结束，${TRIGGER_DELAY_MS / 1000} 秒后执行截图...`);
     setTimeout(async () => {
       try {
+        // Skip very short drives: they are usually noise (e.g. repositioning).
+        const minMinutes = Number(process.env.DRIVE_SCREENSHOT_MIN_MINUTES ?? '2');
+        const minKm = Number(process.env.DRIVE_SCREENSHOT_MIN_KM ?? '0.2');
+
+        try {
+          const carId = this.options.carId;
+          const client = await getGrafanaClient();
+          const { DriveService } = await import('./drive-service.js');
+          const driveService = new DriveService(client);
+          const drives = await driveService.getDrives(carId, { from: 'now-1d', to: 'now', limit: 1 });
+          const lastDrive = drives[0];
+
+          if (lastDrive) {
+            const dMin = Number(lastDrive.duration_min);
+            const dKm = Number(lastDrive.distance);
+            if (
+              (Number.isFinite(minMinutes) && Number.isFinite(dMin) && dMin < minMinutes) ||
+              (Number.isFinite(minKm) && Number.isFinite(dKm) && dKm < minKm)
+            ) {
+              console.log(
+                `[drive] skip screenshot: duration=${dMin}min distance=${dKm}km (min ${minMinutes}min / ${minKm}km)`
+              );
+              return;
+            }
+          }
+        } catch (e) {
+          // Grafana query failed: do not block screenshots; just log and proceed.
+          console.error('[drive] precheck failed, fallback to screenshot:', e instanceof Error ? e.message : e);
+        }
+
         console.log('正在执行行程截图...');
         const { stdout, stderr } = await execAsync('pnpm dev screenshot drive --send -o /tmp/openclaw/drive-latest.png');
         if (stdout) console.log(stdout);
