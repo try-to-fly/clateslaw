@@ -2,7 +2,7 @@ import Configstore from 'configstore';
 
 // Centralized, user-level runtime config for tesla-service.
 // This avoids relying on process ENV (pm2, shells, IDEs) and keeps secrets out of git.
-const APP_NAME = 'tesla-service';
+const APP_NAME = 'tesla-cli';
 
 export type StoredConfig = {
   grafana?: {
@@ -47,6 +47,27 @@ export type StoredConfig = {
 export function getConfigStore(): Configstore {
   return new Configstore(APP_NAME);
 }
+
+/**
+ * Backward-compatible config migration:
+ * - old name: tesla-service
+ * - new name: tesla-cli
+ */
+export function migrateConfigStoreIfNeeded(): void {
+  const current = new Configstore(APP_NAME);
+  if (current.size > 0) return;
+
+  const legacy = new Configstore('tesla-service');
+  if (legacy.size === 0) return;
+
+  // Copy everything once.
+  for (const [k, v] of Object.entries(legacy.all || {})) {
+    current.set(k, v as any);
+  }
+}
+
+migrateConfigStoreIfNeeded();
+
 
 export function loadStoredConfig(): StoredConfig {
   const store = getConfigStore();

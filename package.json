@@ -1,5 +1,5 @@
 {
-  "name": "tesla-service",
+  "name": "tesla-cli",
   "type": "module",
   "bin": {
     "tesla": "./dist/index.js"

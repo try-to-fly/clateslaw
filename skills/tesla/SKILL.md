@@ -1,7 +1,7 @@
 ---
 name: tesla
 description: Tesla 车辆数据查询与可视化，支持行程、充电、电池、效率等数据查询和截图生成
-homepage: https://github.com/nicekate/clateslaw
+homepage: https://github.com/try-to-fly/clateslaw
 metadata:
   openclaw:
     emoji: "🚗"

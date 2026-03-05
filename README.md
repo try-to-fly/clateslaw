@@ -1,6 +1,6 @@
-# Tesla Service (Clateslaw)
+# Tesla CLI
 
-基于 TeslaMate 的 Tesla 数据服务 CLI 工具，为 [OpenClaw](https://github.com/anthropics/openclaw) 提供 Tesla 车辆数据查询能力。
+基于 TeslaMate 的 Tesla 数据服务 CLI 工具，为 [OpenClaw](https://github.com/openclaw/openclaw) 提供 Tesla 车辆数据查询能力。
 
 ## Dev workflow (note)
 
@@ -53,7 +53,7 @@ AI (OpenClaw Skill) 解析自然语言
 - 如果 URL 形如：`/datasources/edit/<uid>`，那么 `<uid>` 就是 `grafana.datasourceUid`
 
 配置示例：
-- `tesla config set grafana.datasourceUid PC98BA2F4D77E1A42`
+- `tesla config set grafana.datasourceUid <YOUR_DATASOURCE_UID>`
 
 ---
 
@@ -69,11 +69,12 @@ AI (OpenClaw Skill) 解析自然语言
 {
   "plugins": [
     {
-      "path": "/path/to/clateslaw",
+      "path": "/path/to/tesla-cli",
       "config": {
         "grafanaUrl": "https://grafana.example.com",
         "grafanaToken": "your-grafana-api-token",
         "defaultCarId": 1
+        // 注：CLI/服务模式的 Grafana datasource UID 使用 configstore 配置（见下文）。
       }
     }
   ]
