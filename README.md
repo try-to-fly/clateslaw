@@ -25,6 +25,38 @@ AI (OpenClaw Skill) 解析自然语言
 
 **Skill 文档**: [`skills/tesla/SKILL.md`](./skills/tesla/SKILL.md)
 
+## CLI 配置（configstore）
+
+本项目的 CLI 使用 `configstore` 保存本机配置（避免写死在代码里，也避免依赖环境变量）。
+
+必选配置项：
+- `grafana.url`
+- `grafana.token`
+- `grafana.datasourceUid`（关键：Grafana datasource UID，用于指定 TeslaMate 的数据源）
+- `openclaw.channel`
+- `openclaw.target`
+
+初始化（交互式）：
+- `tesla config init`
+
+自检（缺少必选项会报错并列出缺失 key）：
+- `tesla config doctor`
+
+### grafana.datasourceUid 如何获取？
+
+在 Grafana UI 中进入：
+- Connections → Data sources → 选择 TeslaMate 使用的 PostgreSQL 数据源
+
+然后找到该数据源的 **UID**（不是 Name，也不是 numeric id）。
+
+你也可以从数据源页面的 URL 里拿到：
+- 如果 URL 形如：`/datasources/edit/<uid>`，那么 `<uid>` 就是 `grafana.datasourceUid`
+
+配置示例：
+- `tesla config set grafana.datasourceUid PC98BA2F4D77E1A42`
+
+---
+
 ## OpenClaw 插件
 
 本项目可以作为 OpenClaw 插件使用，提供 AI Tool 和斜杠命令。
@@ -55,6 +87,9 @@ AI (OpenClaw Skill) 解析自然语言
 | `grafanaUrl` | 是 | Grafana 服务器 URL |
 | `grafanaToken` | 是 | Grafana API Token |
 | `defaultCarId` | 否 | 默认车辆 ID，默认为 1 |
+
+> 说明：上面是 **OpenClaw 插件模式** 的配置。
+> 本项目的 **CLI/服务模式** 还需要配置 Grafana datasource UID（用于指向 TeslaMate 的数据源），见下方「CLI 配置」。
 
 ### 使用方式
 

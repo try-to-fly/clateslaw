@@ -11,6 +11,7 @@ function printConfig(cfg: StoredConfig): void {
   if (safe?.grafana?.token && typeof safe.grafana.token === 'string') {
     safe.grafana.token = maskSecret(safe.grafana.token);
   }
+  // datasourceUid is not a secret; keep as-is for easier debugging.
   console.log(JSON.stringify(safe, null, 2));
 }
 
@@ -40,6 +41,7 @@ configCommand
     const requiredKeys = [
       'grafana.url',
       'grafana.token',
+      'grafana.datasourceUid',
       'openclaw.channel',
       'openclaw.target',
     ];
@@ -73,6 +75,22 @@ configCommand
       const n = Number(value);
       if (!Number.isFinite(n)) throw new Error(`Expected number for ${key}`);
       store.set(key, n);
+      return;
+    }
+
+    // Trim common string fields.
+    if (
+      key === 'grafana.url' ||
+      key === 'grafana.token' ||
+      key === 'grafana.datasourceUid' ||
+      key === 'grafana.datasourceType' ||
+      key === 'openclaw.channel' ||
+      key === 'openclaw.target' ||
+      key === 'openclaw.account' ||
+      key === 'mqtt.host' ||
+      key === 'mqtt.topicPrefix'
+    ) {
+      store.set(key, String(value).trim());
       return;
     }
 
@@ -112,6 +130,20 @@ configCommand
       )) ||
       current.grafana?.token ||
       '';
+
+    const grafanaDatasourceUid =
+      (await rl.question(
+        `grafana.datasourceUid (Grafana datasource UID) [${current.grafana?.datasourceUid || ''}]: `
+      )) ||
+      current.grafana?.datasourceUid ||
+      '';
+
+    const grafanaDatasourceType =
+      (await rl.question(
+        `grafana.datasourceType (optional) [${current.grafana?.datasourceType || 'grafana-postgresql-datasource'}]: `
+      )) ||
+      current.grafana?.datasourceType ||
+      'grafana-postgresql-datasource';
 
     const ocChannel =
       (await rl.question(
@@ -158,6 +190,7 @@ configCommand
 
     if (!grafanaUrl.trim()) throw new Error('grafana.url is required');
     if (!grafanaToken.trim()) throw new Error('grafana.token is required');
+    if (!grafanaDatasourceUid.trim()) throw new Error('grafana.datasourceUid is required');
     if (!ocChannel.trim()) throw new Error('openclaw.channel is required');
     if (!ocTarget.trim()) throw new Error('openclaw.target is required');
     if (!Number.isFinite(mqttPort)) throw new Error('mqtt.port must be a number');
@@ -165,6 +198,8 @@ configCommand
 
     store.set('grafana.url', grafanaUrl);
     store.set('grafana.token', grafanaToken);
+    store.set('grafana.datasourceUid', grafanaDatasourceUid);
+    store.set('grafana.datasourceType', grafanaDatasourceType);
     store.set('openclaw.channel', ocChannel);
     store.set('openclaw.target', ocTarget);
     if (ocAccount.trim()) store.set('openclaw.account', ocAccount);

@@ -8,6 +8,10 @@ export type StoredConfig = {
   grafana?: {
     url?: string;
     token?: string;
+    /** Grafana datasource UID, e.g. PC98BA2F4D77E1A42 */
+    datasourceUid?: string;
+    /** Grafana datasource type, usually grafana-postgresql-datasource */
+    datasourceType?: string;
   };
   openclaw?: {
     channel?: string;

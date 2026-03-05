@@ -109,10 +109,13 @@ export function parseGrafanaTime(timeStr: string): string {
   return date.toISOString();
 }
 
-/** 默认数据源配置 */
+/**
+ * 默认数据源配置（仅作为兼容兜底）。
+ * 注意：datasource UID 不应写死；真实运行应由上层 config（configstore）提供。
+ */
 const DEFAULT_DATASOURCE: GrafanaDataSource = {
   type: 'grafana-postgresql-datasource',
-  uid: 'PC98BA2F4D77E1A42',
+  uid: '',
 };
 
 /** Grafana API 错误 */
@@ -143,6 +146,7 @@ export class GrafanaClient {
 
   constructor(config: GrafanaClientConfig) {
     const baseUrl = config.baseUrl.replace(/\/$/, '');
+    // Prefer configured datasource; fallback kept for backward compatibility.
     this.datasource = config.datasource ?? DEFAULT_DATASOURCE;
     this.cache = new Map();
     this.cacheTTL = config.cacheTTL ?? 5 * 60 * 1000; // 默认 5 分钟

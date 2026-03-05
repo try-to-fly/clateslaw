@@ -33,6 +33,10 @@ export const config = (() => {
     grafana: {
       url: requireCfg(grafana.url, 'grafana.url'),
       token: requireCfg(grafana.token, 'grafana.token'),
+      datasource: {
+        uid: requireCfg(grafana.datasourceUid, 'grafana.datasourceUid'),
+        type: optionalString(grafana.datasourceType, 'grafana-postgresql-datasource'),
+      },
     },
     openclaw: {
       channel: requireCfg(openclaw.channel, 'openclaw.channel'),
