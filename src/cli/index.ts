@@ -28,7 +28,7 @@ const program = new Command();
 
 program
   .name('tesla')
-  .description('Tesla Service CLI')
+  .description('Tesla CLI')
   .version('1.0.0');
 
 program

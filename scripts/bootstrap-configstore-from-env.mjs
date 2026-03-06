@@ -11,7 +11,7 @@ function optionalEnv(key, fallback) {
   return process.env[key] ?? fallback;
 }
 
-const store = new Configstore('tesla-service');
+const store = new Configstore('tesla-cli');
 
 // Grafana
 store.set('grafana.url', requireEnv('GRAFANA_URL'));

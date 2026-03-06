@@ -15,7 +15,7 @@ async function main() {
 
   const url = `mqtt://${host}:${port}`;
   const client = mqtt.connect(url, {
-    clientId: `tesla-service-mqtt-pub-${Date.now()}`,
+    clientId: `tesla-cli-mqtt-pub-${Date.now()}`,
     connectTimeout: 10_000,
     reconnectPeriod: 0,
     clean: true,

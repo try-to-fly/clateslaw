@@ -78,7 +78,7 @@ export class MqttService {
     console.log(`正在连接 MQTT Broker: ${brokerUrl}`);
 
     this.client = mqtt.connect(brokerUrl, {
-      clientId: `tesla-service-${Date.now()}`,
+      clientId: `tesla-cli-${Date.now()}`,
       reconnectPeriod: 5000,
       keepalive: 30,           // 30秒心跳，更频繁保持连接
       connectTimeout: 30000,   // 30秒连接超时

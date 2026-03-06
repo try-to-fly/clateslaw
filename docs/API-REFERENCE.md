@@ -1,4 +1,4 @@
-# Tesla Service CLI API 参考文档
+# Tesla CLI API 参考文档
 
 本文档记录了 CLI 命令与 Grafana 仪表板的对应关系，以及各字段的语义说明。
 

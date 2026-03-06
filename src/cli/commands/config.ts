@@ -16,7 +16,7 @@ function printConfig(cfg: StoredConfig): void {
 }
 
 export const configCommand = new Command('config').description(
-  'Manage local tesla-service config (stored via configstore)'
+  'Manage local tesla-cli config (stored via configstore)'
 );
 
 configCommand

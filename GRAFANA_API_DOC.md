@@ -101,7 +101,7 @@ Authorization: Bearer <API_KEY>
 #### 项目结构
 
 ```
-tesla-service/
+tesla-cli/
 ├── src/
 │   ├── config/
 │   │   └── grafana.js          # Grafana 配置
@@ -430,7 +430,7 @@ app.get("/health", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Tesla Service API running on port ${PORT}`);
+  console.log(`Tesla CLI API running on port ${PORT}`);
 });
 ```
 
@@ -438,7 +438,7 @@ app.listen(PORT, () => {
 
 ```json
 {
-  "name": "tesla-service",
+  "name": "tesla-cli",
   "version": "1.0.0",
   "description": "TeslaMate Grafana API Wrapper",
   "main": "src/index.js",
