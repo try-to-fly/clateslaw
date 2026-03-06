@@ -48,6 +48,7 @@ export async function getGrafanaClient(): Promise<GrafanaClient> {
       clientInstance = new GrafanaClient({
         baseUrl: config.grafana.url,
         token: config.grafana.token,
+        datasource: config.grafana.datasource,
       });
     }
   }
