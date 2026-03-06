@@ -45,6 +45,8 @@ export interface StateTracker {
   lastNavThresholdNotifiedMinutes: number[];
   // Arrival message sent for the current destination.
   lastNavArrivedNotified: boolean;
+  // Route started push sent for the current active route.
+  lastNavStartedNotified: boolean;
 }
 
 export interface PersistedMqttState {
@@ -67,6 +69,7 @@ export interface PersistedMqttState {
   lastNavMinutes?: number | null;
   lastNavThresholdNotifiedMinutes?: number[];
   lastNavArrivedNotified?: boolean;
+  lastNavStartedNotified?: boolean;
 
   lastUpdated: number;
 }

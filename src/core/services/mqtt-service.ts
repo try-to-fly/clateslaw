@@ -53,6 +53,9 @@ export class MqttService {
     lastNavMinutes: null,
     lastNavThresholdNotifiedMinutes: [],
     lastNavArrivedNotified: false,
+    // Whether we've already sent the "route started" push for the current active route.
+    // This prevents duplicate start pushes during the same route and across MQTT ticks.
+    lastNavStartedNotified: false,
   };
 
   private lastRatedRangeKm: number | null = null;
@@ -477,12 +480,14 @@ export class MqttService {
       if (
         this.state.lastNavDestination ||
         this.state.lastNavThresholdNotifiedMinutes.length ||
-        this.state.lastNavMinutes != null
+        this.state.lastNavMinutes != null ||
+        this.state.lastNavStartedNotified
       ) {
         this.state.lastNavDestination = null;
         this.state.lastNavMinutes = null;
         this.state.lastNavThresholdNotifiedMinutes = [];
         this.state.lastNavArrivedNotified = false;
+        this.state.lastNavStartedNotified = false;
         this.schedulePersist();
       }
       return;
@@ -496,12 +501,14 @@ export class MqttService {
       if (
         this.state.lastNavDestination ||
         this.state.lastNavThresholdNotifiedMinutes.length ||
-        this.state.lastNavMinutes != null
+        this.state.lastNavMinutes != null ||
+        this.state.lastNavStartedNotified
       ) {
         this.state.lastNavDestination = null;
         this.state.lastNavMinutes = null;
         this.state.lastNavThresholdNotifiedMinutes = [];
         this.state.lastNavArrivedNotified = false;
+        this.state.lastNavStartedNotified = false;
         this.schedulePersist();
       }
       return;
@@ -543,18 +550,20 @@ export class MqttService {
       }
     }
 
-    // Reset per-route state when destination changes.
-    // Also send an immediate "route started" push when a matching destination starts.
-    if (this.state.lastNavDestination !== destination) {
-      const prev = this.state.lastNavDestination;
-      if (process.env.MQTT_DEBUG === '1') {
-        console.log(`[nav] destination changed: ${prev || '(none)'} -> ${destination}`);
-      }
+    // Send an immediate "route started" push when a matching destination starts.
+    // Requirement: only send once per route start; do NOT re-send just because the service restarts.
+    const startedAlready = this.state.lastNavStartedNotified === true;
+    const isNewRouteStart =
+      !startedAlready &&
+      // treat it as a new start when we previously had no nav state
+      (this.state.lastNavDestination == null || this.state.lastNavMinutes == null);
+
+    if (isNewRouteStart) {
+      // Reset per-route state on start.
       this.state.lastNavDestination = destination;
       this.state.lastNavMinutes = minutes;
       this.state.lastNavThresholdNotifiedMinutes = [];
       this.state.lastNavArrivedNotified = false;
-      this.schedulePersist();
 
       try {
         const messageService = getMessageService();
@@ -576,10 +585,27 @@ export class MqttService {
           target: navOc?.target,
           account: navOc?.account,
         });
+
+        this.state.lastNavStartedNotified = true;
+        this.schedulePersist();
         console.log(`[nav] sent(started): ${destination} (${minutes}min${distKm != null ? `/${distKm}km` : ''})`);
       } catch (error) {
         console.error('发送导航开始推送失败:', error instanceof Error ? error.message : error);
       }
+    }
+
+    // Reset per-route state when destination changes (mid-route).
+    if (this.state.lastNavDestination !== destination) {
+      const prev = this.state.lastNavDestination;
+      if (process.env.MQTT_DEBUG === '1') {
+        console.log(`[nav] destination changed: ${prev || '(none)'} -> ${destination}`);
+      }
+      this.state.lastNavDestination = destination;
+      this.state.lastNavMinutes = minutes;
+      this.state.lastNavThresholdNotifiedMinutes = [];
+      this.state.lastNavArrivedNotified = false;
+      // Don't reset started flag here; destination name can fluctuate.
+      this.schedulePersist();
     }
 
     // minutes/distKm/locStr/regeo already computed above
@@ -947,6 +973,10 @@ export class MqttService {
         ? persisted.lastNavArrivedNotified
         : false;
 
+      this.state.lastNavStartedNotified = typeof (persisted as any).lastNavStartedNotified === 'boolean'
+        ? (persisted as any).lastNavStartedNotified
+        : false;
+
       console.log(`已加载持久化状态: ${statePath}`);
       console.log(`  车辆状态: ${this.state.vehicleState || '(无)'}`);
       console.log(`  充电状态: ${this.state.chargingState || '(无)'}`);
@@ -1005,6 +1035,7 @@ export class MqttService {
       lastNavMinutes: this.state.lastNavMinutes,
       lastNavThresholdNotifiedMinutes: this.state.lastNavThresholdNotifiedMinutes,
       lastNavArrivedNotified: this.state.lastNavArrivedNotified,
+      lastNavStartedNotified: this.state.lastNavStartedNotified,
 
       lastUpdated: Date.now(),
     };
