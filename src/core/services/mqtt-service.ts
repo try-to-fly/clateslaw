@@ -620,6 +620,8 @@ export class MqttService {
     const navOc = navCfg.openclaw;
 
     // Threshold-based pushes: 15/10/5 ... (send once when crossing).
+    // Also survive service restarts: if we restart mid-route and wake up already below
+    // a threshold that hasn't been sent yet, we should still send it once.
     const lastMinutes = this.state.lastNavMinutes;
     for (const t of thresholds) {
       const crossed =
@@ -628,7 +630,14 @@ export class MqttService {
         lastMinutes > t &&
         minutes <= t;
 
-      if (crossed && !this.state.lastNavThresholdNotifiedMinutes.includes(t)) {
+      const afterRestartCatchup =
+        typeof lastMinutes === 'number' &&
+        Number.isFinite(lastMinutes) &&
+        minutes <= t &&
+        !this.state.lastNavThresholdNotifiedMinutes.includes(t) &&
+        this.state.lastNavStartedNotified;
+
+      if ((crossed || afterRestartCatchup) && !this.state.lastNavThresholdNotifiedMinutes.includes(t)) {
         let text = `🧭 导航提醒`;
         text += `\n目的地: ${destination}`;
         text += `\n当前位置: ${locStr}`;
