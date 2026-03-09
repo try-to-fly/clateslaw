@@ -6,7 +6,7 @@ Tesla CLI 是一个基于 TeslaMate / Grafana 的 Tesla 数据查询、可视化
 - **CLI 查询**：本地查看车辆、行程、充电、电池等数据
 - **Screenshot 渲染**：把行程、充电等结果生成图片
 - **MQTT 实时服务**：监听 TeslaMate MQTT 事件并触发通知/截图
-- **OpenClaw 集成**：给 OpenClaw 提供 `/tesla` 命令和查询能力
+- **OpenClaw 使用约定**：通过工作区 `TOOLS.md` 暴露 `tesla` CLI，让 OpenClaw 能自然语言调用 Tesla 能力
 
 如果你想做的不只是“看数据”，而是把 Tesla 数据接到日常使用场景里，这个项目就是为这种需求准备的。
 
@@ -18,7 +18,6 @@ Tesla CLI 是一个基于 TeslaMate / Grafana 的 Tesla 数据查询、可视化
 - 想生成截图：[`docs/screenshots.md`](./docs/screenshots.md)
 - 想跑 MQTT 实时通知：[`docs/mqtt-service.md`](./docs/mqtt-service.md)
 - 想从 OpenClaw 里使用：[`docs/openclaw/README.md`](./docs/openclaw/README.md)
-- 想接 OpenClaw 插件：[`docs/openclaw-plugin.md`](./docs/openclaw-plugin.md)
 - 想看查询协议 / 字段语义：[`docs/API-REFERENCE.md`](./docs/API-REFERENCE.md)
 - 改完代码想回归：[`docs/REGRESSION-CHECKLIST.md`](./docs/REGRESSION-CHECKLIST.md)
 
@@ -59,13 +58,14 @@ Tesla CLI 是一个基于 TeslaMate / Grafana 的 Tesla 数据查询、可视化
 
 详见：[`docs/mqtt-service.md`](./docs/mqtt-service.md)
 
-### 4. OpenClaw 集成
+### 4. OpenClaw 使用方式
 
-仓库可以直接作为 OpenClaw 插件接入，提供：
-- `/tesla` command
-- Tesla 查询能力给 AI 使用
+实际使用方式是：
+- 通过 `tesla` CLI 提供查询、截图、发送能力
+- 通过工作区 `TOOLS.md` 告诉 OpenClaw 本机有哪些 Tesla 命令、该怎么调用
+- 通过 PM2 持续运行 MQTT 检测服务，负责自动化通知链路
 
-详见：[`docs/openclaw-plugin.md`](./docs/openclaw-plugin.md)
+详见：[`docs/openclaw/README.md`](./docs/openclaw/README.md)
 
 ## 快速开始
 
@@ -103,7 +103,6 @@ pnpm exec tesla screenshot drive --record-id 4275 -o /tmp/drive.png
 src/
   cli/        Commander CLI 命令层
   core/       Grafana 查询、业务服务、时间语义、MQTT 逻辑
-  plugin/     OpenClaw 插件入口（command + tool）
   web/        截图/可视化页面（Vite + React）
   config/     configstore 配置读取
   types/      查询结果与协议类型
@@ -122,11 +121,11 @@ Grafana datasource / API
 src/core/query-executor.ts
    ├─ CLI commands
    ├─ Screenshot rendering
-   ├─ OpenClaw integration
+   ├─ OpenClaw CLI-based integration
    └─ MQTT event handlers
 ```
 
-一句话理解：**数据入口尽量统一收口在 `core`，CLI / 截图 / MQTT / OpenClaw 只是不同出口。**
+一句话理解：**数据入口尽量统一收口在 `core`，CLI / 截图 / MQTT / OpenClaw（经由 CLI）只是不同出口。**
 
 ## 配置方式
 
@@ -139,6 +138,8 @@ src/core/query-executor.ts
 - `openclaw.channel`
 - `openclaw.target`
 - MQTT 相关配置（如果启用 MQTT service）
+
+说明：这里的 `openclaw.*` 是 **CLI / 自动通知发送配置**。
 
 初始化与排障见：[`docs/getting-started.md`](./docs/getting-started.md)
 
@@ -161,9 +162,9 @@ pnpm test:run      # 一次性测试
 1. `src/cli/index.ts`
 2. `src/core/query-executor.ts`
 3. `src/core/services/*`
-4. `src/plugin/*`
-5. `src/web/*`
-6. `src/cli/commands/mqtt.ts` + `src/core/services/mqtt-service.ts`
+4. `src/web/*`
+5. `src/cli/commands/mqtt.ts` + `src/core/services/mqtt-service.ts`
+6. `docs/openclaw/*` + OpenClaw 工作区 `TOOLS.md`
 
 ## 说明
 

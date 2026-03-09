@@ -87,7 +87,7 @@ tesla where 1 --amap
 tesla query '{"version":"1.0","type":"drives","carId":1,"timeRange":{"semantic":"last_7_days"}}'
 ```
 
-这是最稳定的程序化入口，CLI 子命令和 OpenClaw 查询能力都可以收敛到这套协议。
+这是最稳定的程序化入口，CLI 子命令、OpenClaw 的自然语言调用、以及自动化场景都应该尽量收敛到这套协议。
 
 ## 输出格式
 

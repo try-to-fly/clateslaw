@@ -3,16 +3,17 @@
 这组文档说明如何把 Tesla CLI 接入 OpenClaw，并在聊天场景中稳定使用。
 
 重点包括：
-- 自然语言查询如何映射到 Tesla 查询能力
+- 自然语言查询如何映射到 Tesla CLI / 查询能力
 - 什么场景适合返回数据，什么场景适合生成截图
 - 怎样通过 OpenClaw 发送查询结果、截图和自动通知
+- 怎样通过工作区 `TOOLS.md` 让 OpenClaw 学会调用 `tesla` CLI
 
 ## 适合谁看
 
 - 维护 OpenClaw Tesla 集成的人
 - 需要通过自然语言查询 Tesla 数据的人
 - 需要配置自动通知、截图发送或查询流程的人
-- 维护相关 skill、工具配置或插件行为的人
+- 维护相关 skill、工具配置或 CLI 调用约定的人
 
 ## 建议阅读顺序
 
@@ -27,9 +28,11 @@
 - 仓库 README
 - Tesla skill
 - 本地工具说明
-- OpenClaw 插件实现
+- OpenClaw 工作区 `TOOLS.md`
 
 这组文档的目标是把 OpenClaw 侧的使用方式集中整理，便于统一维护与查阅。
+
+当前约定很简单：**OpenClaw 通过本机 `tesla` CLI 使用 Tesla 能力；自然语言调用是否顺手，取决于工作区 `TOOLS.md` 是否写清楚命令、默认路径和调用约定。**
 
 ## 一个简单原则
 

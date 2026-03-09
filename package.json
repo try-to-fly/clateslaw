@@ -4,11 +4,6 @@
   "bin": {
     "tesla": "./dist/index.js"
   },
-  "openclaw": {
-    "extensions": [
-      "./dist/plugin/index.js"
-    ]
-  },
   "scripts": {
     "dev": "tsx src/index.ts",
     "dev:web": "vite",

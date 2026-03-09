@@ -107,4 +107,4 @@ Grafana token 权限不足，或者 URL / token 配置有误。
 - CLI 使用说明：[`./cli.md`](./cli.md)
 - 截图与可视化：[`./screenshots.md`](./screenshots.md)
 - MQTT 实时监听：[`./mqtt-service.md`](./mqtt-service.md)
-- OpenClaw 插件接入：[`./openclaw-plugin.md`](./openclaw-plugin.md)
+- OpenClaw 中如何通过 CLI 使用：[`./openclaw/README.md`](./openclaw/README.md)

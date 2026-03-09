@@ -100,11 +100,11 @@ tesla screenshot weekly 2026-03-06 -c 1 --send
 
 `skills/tesla/SKILL.md` 负责把自然语言意图映射成命令策略。
 
-### 2. 插件层
+### 2. CLI 调用约定层
 
-仓库的 OpenClaw 插件提供：
-- `/tesla` command
-- `tesla_query` tool
+OpenClaw 要想稳定使用 Tesla 能力，依赖两件事：
+- 本机存在可用的 `tesla` CLI
+- 工作区 `TOOLS.md` 里写清楚常用命令、默认 `carId`、截图/发送约定、以及什么场景该走 query / screenshot
 
 ### 3. 本地工具说明
 
