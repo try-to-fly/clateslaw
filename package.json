@@ -2,7 +2,7 @@
   "name": "tesla-cli2",
   "type": "module",
   "bin": {
-    "tesla": "./dist/index.js"
+    "tesla": "./bin/tesla.js"
   },
   "scripts": {
     "dev": "tsx src/index.ts",
@@ -69,9 +69,22 @@
     "node": ">=20"
   },
   "files": [
-    "dist",
+    "bin",
+    "dist/cli",
+    "dist/config",
+    "dist/constants.js",
+    "dist/core",
+    "dist/errors",
+    "dist/index.js",
+    "dist/notify",
+    "dist/types",
+    "dist/web",
     "README.md",
-    "docs"
+    "docs/cli.md",
+    "docs/getting-started.md",
+    "docs/mqtt-service.md",
+    "docs/screenshots.md",
+    "docs/API-REFERENCE.md"
   ],
   "publishConfig": {
     "access": "public"
