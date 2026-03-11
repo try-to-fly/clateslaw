@@ -14,7 +14,7 @@
     "collect": "tsx scripts/collect-data.ts",
     "test": "vitest",
     "test:run": "vitest run",
-    "prepublishOnly": "npm run test:run && npm run build"
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",
