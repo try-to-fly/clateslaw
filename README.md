@@ -10,6 +10,147 @@ Tesla CLI 是一个基于 TeslaMate / Grafana 的 Tesla 数据查询、可视化
 
 如果你想做的不只是“看数据”，而是把 Tesla 数据接到日常使用场景里，这个项目就是为这种需求准备的。
 
+## 3 分钟上手
+
+如果你只是想 **通过 npm 安装，然后马上开始用**，按下面走就行。
+
+### 1) 全局安装
+
+```bash
+# 推荐：跳过 puppeteer 浏览器下载，安装更稳更快
+PUPPETEER_SKIP_DOWNLOAD=1 npm install -g tesla-cli2
+
+# 如果你的网络需要代理
+HTTP_PROXY=http://127.0.0.1:7890 \
+HTTPS_PROXY=http://127.0.0.1:7890 \
+ALL_PROXY=http://127.0.0.1:7890 \
+PUPPETEER_SKIP_DOWNLOAD=1 \
+npm install -g tesla-cli2
+
+# 验证安装
+tesla --version
+tesla --help
+```
+
+为什么默认推荐 `PUPPETEER_SKIP_DOWNLOAD=1`：
+- CLI 查询、MQTT 服务、绝大多数日常功能 **不依赖** 安装阶段下载浏览器
+- 某些网络 / 代理环境下，`puppeteer` 的 Chrome 下载可能失败，导致 `npm install` 卡住或报错
+- 先跳过下载，能让用户更稳定地把 CLI 装起来
+
+如果你后面需要截图功能，再看下文的“截图能力说明”。
+
+### 2) 初始化配置
+
+```bash
+tesla config init
+```
+
+至少准备这些配置：
+- `grafana.url`
+- `grafana.token`
+- `grafana.datasourceUid`
+- `openclaw.channel`
+- `openclaw.target`
+- `mqtt.host`
+- `mqtt.port`
+- `mqtt.carId`
+- `mqtt.topicPrefix`
+
+初始化完成后可以检查：
+
+```bash
+tesla config get
+tesla config doctor
+```
+
+期望输出：
+- `config get` 能正常显示配置（敏感字段会打码）
+- `config doctor` 输出 `OK`
+
+### 3) 先跑两个命令确认 CLI 正常
+
+```bash
+tesla cars -o json
+tesla battery 1 -o json
+```
+
+如果这两条都通，说明：
+- npm 安装出来的 CLI 能正常执行
+- 配置能被正确读取
+- Grafana / TeslaMate 数据链路基本正常
+
+### 4) 如果你要跑 MQTT 实时服务
+
+```bash
+npm install -g pm2
+tesla service install
+tesla service status
+pm2 logs tesla-mqtt --lines 80 --nostream
+```
+
+期望看到：
+- `tesla-mqtt` 状态为 `online`
+- 日志里出现：
+  - `MQTT 服务配置:`
+  - `正在连接 MQTT Broker:`
+  - `MQTT 连接成功`
+  - 多条订阅成功 / 状态变化日志
+
+### 5) 如果你想快速验证 MQTT 事件链路
+
+```bash
+tesla mqtt test state online
+tesla mqtt test drive-cycle
+tesla mqtt test charge-cycle
+```
+
+这些命令会往你配置的 MQTT broker 发送测试事件，用来验证：
+- CLI 能否正常 publish MQTT
+- 后台 MQTT 服务能否收到事件
+- 日志 / 截图 / 通知链路是否按预期工作
+
+## 最常用命令
+
+装好后，大多数用户先用这几条就够了：
+
+```bash
+# 查看车辆
+tesla cars -o json
+
+# 看电池状态
+tesla battery 1 -o json
+
+# 看最近几次行程
+tesla drives 1 -l 5
+
+# 看最近几次充电
+tesla charges 1 -l 5
+
+# 看车辆当前位置
+tesla where 1 --amap
+
+# 启动 MQTT 监听
+tesla mqtt listen
+
+# 查看 MQTT 服务状态
+tesla service status
+```
+
+## 截图能力说明
+
+截图功能依赖 Web 渲染链路。
+
+如果你主要想：
+- 查数据
+- 跑 MQTT 服务
+- 让 OpenClaw / 自动化去消费这些数据
+
+那么**即使安装时跳过了 puppeteer 下载，也完全可以先用起来**。
+
+如果你后面需要“生成截图 / 卡片图片”，再看：
+- [`docs/screenshots.md`](./docs/screenshots.md)
+- [`docs/getting-started.md`](./docs/getting-started.md)
+
 ## 从哪里开始
 
 按目标选入口：
@@ -67,46 +208,9 @@ Tesla CLI 是一个基于 TeslaMate / Grafana 的 Tesla 数据查询、可视化
 
 详见：[`docs/openclaw/README.md`](./docs/openclaw/README.md)
 
-## npm 全局安装
+## 本地开发
 
-```bash
-npm install -g tesla-cli2
-tesla --version
-tesla config init
-```
-
-如果你要跑 MQTT 常驻服务：
-
-```bash
-npm install -g pm2
-tesla service install
-tesla service status
-```
-
-## 自动发布到 npm
-
-仓库已包含：
-- `.github/workflows/ci.yml`：push / PR 时执行测试和构建
-- `.github/workflows/release.yml`：push `v*` tag 时自动发布 npm
-
-使用方式：
-
-```bash
-# 1. 确认 package.json version 已更新
-git add .
-git commit -m "chore: release v1.0.0"
-git tag v1.0.0
-git push origin main --follow-tags
-```
-
-在 GitHub 仓库 Settings → Secrets and variables → Actions 中添加：
-- `NPM_TOKEN`
-
-`NPM_TOKEN` 来自 npm 网站的 Access Token，建议使用 publish 权限最小化配置。
-
-## 快速开始
-
-### 本地 CLI
+### 快速开始
 
 ```bash
 pnpm install
@@ -133,6 +237,27 @@ pnpm exec tesla mqtt listen
 ```bash
 pnpm exec tesla screenshot drive --record-id 4275 -o /tmp/drive.png
 ```
+
+## 自动发布到 npm
+
+仓库已包含：
+- `.github/workflows/ci.yml`：push / PR 时执行测试和构建
+- `.github/workflows/release.yml`：push `v*` tag 时自动发布 npm
+
+使用方式：
+
+```bash
+# 1. 确认 package.json version 已更新
+git add .
+git commit -m "chore: release v1.0.0"
+git tag v1.0.0
+git push origin main --follow-tags
+```
+
+在 GitHub 仓库 Settings → Secrets and variables → Actions 中添加：
+- `NPM_TOKEN`
+
+`NPM_TOKEN` 来自 npm 网站的 Access Token，建议使用 publish 权限最小化配置。
 
 ## 项目结构
 
