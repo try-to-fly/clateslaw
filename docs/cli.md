@@ -63,6 +63,18 @@ tesla drives 1 -l 5
 tesla charges 1 --from now-30d --to now
 ```
 
+### 截取某一天的日报/行程图
+
+```bash
+tesla screenshot daily 2026-03-06
+```
+
+### 截取任意时间范围的行程图
+
+```bash
+tesla screenshot range --from "2026-02-21 10:00" --to "2026-02-22 04:00" -c 1
+```
+
 ### 查看电池健康
 
 ```bash

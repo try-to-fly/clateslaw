@@ -43,6 +43,12 @@ tesla screenshot query '{"version":"1.0","type":"drives","carId":1,"pagination":
 tesla screenshot daily 2026-03-06 -c 1
 ```
 
+或任意时间范围：
+
+```bash
+tesla screenshot range --from "2026-02-21 10:00" --to "2026-02-22 04:00" -c 1
+```
+
 特点：
 - 更适合“看图说话”
 - 更适合直接发到聊天软件

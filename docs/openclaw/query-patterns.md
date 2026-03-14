@@ -124,12 +124,13 @@ tesla screenshot query '<TeslaQuery JSON>'
 - `type = detail.drive | detail.charge`
 - `recordId = 提取出的 ID`
 
-### 模式 C：日报 / 周报 / 月报 / 年报
+### 模式 C：日报 / 周报 / 月报 / 年报 / 时间范围行程图
 
 统一模式：
 - `type = screenshot`
 - `screenshot.type = daily | weekly | monthly | yearly`
 - 如带明确日期，则补 `screenshot.date`
+- 如用户给的是任意起止时间（比如“10 点到第二天 4 点”），则保留 `timeRange.absolute.from/to`，并走时间范围截图
 
 ### 模式 D：统计问句
 

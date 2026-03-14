@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import handler from 'serve-handler';
 import { getGrafanaClient, DriveService, ChargeService, StatsService, TPMSService, getMessageService } from '../../core/index.js';
 import { getWeekRange, getMonthRange } from '../../core/utils/time.js';
+import { resolveTimeRange } from '../../core/semantic-time.js';
 import { browserPool } from '../../core/utils/browser-pool.js';
 import { SCREENSHOT } from '../../constants.js';
 import { config } from '../../config/index.js';
@@ -16,6 +17,7 @@ import type { ChargeRecord, ChargeCurvePoint } from '../../types/charge.js';
 import { getMockDriveData, getMockChargeData, getMockDailyData } from './screenshot-mock.js';
 import { executeQuery } from '../../core/query-executor.js';
 import type { TeslaQuery } from '../../types/query-protocol.js';
+import { buildRangeScreenshotQuery, resolveExplicitTimeRange } from './screenshot-range.js';
 
 interface DriveData {
   drive: DriveRecord;
@@ -406,26 +408,38 @@ async function getChargeData(carId: number, chargeId: number): Promise<ChargeDat
   return { charge, curve };
 }
 
-async function getDailyData(carId: number, dateStr: string): Promise<DailyData> {
+async function getDailyData(
+  carId: number,
+  dateStr: string,
+  customRange?: { from: string; to: string }
+): Promise<DailyData> {
   const client = await getGrafanaClient();
   const driveService = new DriveService(client);
   const chargeService = new ChargeService(client);
   const tpmsService = new TPMSService(client);
 
-  // Interpret dateStr (YYYY-MM-DD) as a local calendar day.
-  // IMPORTANT: `new Date('YYYY-MM-DD')` is parsed as UTC midnight by JS,
-  // which becomes 08:00 local time in Asia/Shanghai. Build the local day
-  // boundaries explicitly to avoid missing early-morning drives.
-  const [y, m, d] = dateStr.split('-').map((n) => parseInt(n, 10));
-  const startOfDay = new Date(y, m - 1, d, 0, 0, 0, 0);
-  const endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999);
+  let from: string;
+  let to: string;
 
-  const from = startOfDay.toISOString();
-  const to = endOfDay.toISOString();
+  if (customRange) {
+    from = customRange.from;
+    to = customRange.to;
+  } else {
+    // Interpret dateStr (YYYY-MM-DD) as a local calendar day.
+    // IMPORTANT: `new Date('YYYY-MM-DD')` is parsed as UTC midnight by JS,
+    // which becomes 08:00 local time in Asia/Shanghai. Build the local day
+    // boundaries explicitly to avoid missing early-morning drives.
+    const [y, m, d] = dateStr.split('-').map((n) => parseInt(n, 10));
+    const startOfDay = new Date(y, m - 1, d, 0, 0, 0, 0);
+    const endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999);
+
+    from = startOfDay.toISOString();
+    to = endOfDay.toISOString();
+  }
 
   const [drives, charges, tpmsStats] = await Promise.all([
-    driveService.getDrives(carId, { from, to, limit: 50 }),
-    chargeService.getCharges(carId, { from, to, limit: 50 }),
+    driveService.getDrives(carId, { from, to, limit: 200 }),
+    chargeService.getCharges(carId, { from, to, limit: 200 }),
     tpmsService.getStats(carId, { from, to }),
   ]);
 
@@ -741,6 +755,55 @@ async function screenshotDaily(
   }
 }
 
+async function screenshotRange(
+  fromStr: string,
+  toStr: string,
+  options: ScreenshotOptions
+): Promise<void> {
+  const width = parseInt(options.width || String(SCREENSHOT.DEFAULT_WIDTH), 10);
+  const scale = parseInt(options.scale || String(SCREENSHOT.DEFAULT_SCALE), 10);
+  const range = resolveExplicitTimeRange(fromStr, toStr);
+  const query = buildRangeScreenshotQuery({
+    from: fromStr,
+    to: toStr,
+    carId: parseInt(options.carId || '1', 10),
+    send: options.send,
+  });
+
+  const data = await getDailyData(
+    query.carId || 1,
+    query.screenshot?.date || new Date(range.from).toLocaleDateString('en-CA'),
+    range
+  );
+
+  const fromLabel = fromStr.trim();
+  const toLabel = toStr.trim();
+  const outputPath = options.output || path.join(os.tmpdir(), `range-${Date.now()}.png`);
+
+  await sendPreNotification('时间范围行程', `${fromLabel} → ${toLabel}`, options);
+
+  const distPath = await ensureWebBuild();
+  const server = await startServer(distPath);
+  const port = getServerPort(server);
+
+  try {
+    const theme = options.theme || 'tesla';
+    await takeScreenshot(
+      `http://localhost:${port}/daily?theme=${theme}`,
+      data,
+      outputPath,
+      width,
+      scale
+    );
+    await sendAndCleanup(outputPath, options, `${fromLabel} → ${toLabel} 行程截图`);
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    await sendFailureNotification(`${fromLabel} → ${toLabel} 行程截图`, errorMsg, options);
+    throw error;
+  } finally {
+    server.close();
+  }
+}
 
 async function screenshotWeekly(
   dateStr: string | undefined,
@@ -979,7 +1042,8 @@ async function fetchDataForScreenshot(
 
     case 'daily': {
       const date = query.screenshot?.date || new Date().toLocaleDateString('en-CA');
-      return getDailyData(carId, date);
+      const customRange = query.timeRange ? resolveTimeRange(query.timeRange) : undefined;
+      return getDailyData(carId, date, customRange);
     }
 
     case 'weekly': {
@@ -1158,6 +1222,21 @@ export const screenshotCommand = new Command('screenshot')
       .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
       .option('--mock', '使用 Mock 数据（无需连接 Grafana）')
       .action(screenshotDaily)
+  )
+  .addCommand(
+    new Command('range')
+      .description('Screenshot drives within an explicit time range')
+      .requiredOption('--from <datetime>', 'Start datetime, e.g. 2026-02-21 10:00')
+      .requiredOption('--to <datetime>', 'End datetime, e.g. 2026-02-22 04:00')
+      .option('-o, --output <path>', 'Output file path')
+      .option('-w, --width <number>', 'Viewport width', String(SCREENSHOT.DEFAULT_WIDTH))
+      .option('--scale <number>', 'Device pixel ratio', String(SCREENSHOT.DEFAULT_SCALE))
+      .option('-c, --car-id <number>', 'Car ID', '1')
+      .option('-s, --send', '发送消息后删除文件')
+      .option('-t, --target <id>', '消息目标 ID (默认: openclaw.target)')
+      .option('-m, --message <text>', '自定义消息')
+      .option('--theme <name>', '主题风格 (tesla/cyberpunk/glass)', 'tesla')
+      .action((options) => screenshotRange(options.from, options.to, options))
   )
   .addCommand(
     new Command('weekly')
