@@ -77,18 +77,12 @@ function getCurrentPathEnv(): string {
   return process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin';
 }
 
-function resolvePnpmPath(): string {
-  const pnpmFromEnv = process.env.npm_execpath;
-  if (typeof pnpmFromEnv === 'string' && pnpmFromEnv.trim()) return pnpmFromEnv.trim();
-  return 'pnpm';
-}
-
 function buildPlist(hour: number, minute: number, cwd: string): string {
   const outPath = path.join(getLogsDir(), 'daily-screenshot-launchd.out.log');
   const errPath = path.join(getLogsDir(), 'daily-screenshot-launchd.err.log');
   const pathEnv = getCurrentPathEnv();
-  const pnpmPath = resolvePnpmPath();
-  const shellScript = `${JSON.stringify(pnpmPath)} dev screenshot daily $(date +%F) --send -o /tmp/openclaw/daily-$(date +%F).png`;
+  const nodePath = process.execPath;
+  const runnerPath = path.join(cwd, 'scripts', 'daily-launchd-runner.js');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -99,9 +93,8 @@ function buildPlist(hour: number, minute: number, cwd: string): string {
 
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/bash</string>
-    <string>-lc</string>
-    <string>${xmlEscape(shellScript)}</string>
+    <string>${xmlEscape(nodePath)}</string>
+    <string>${xmlEscape(runnerPath)}</string>
   </array>
 
   <key>WorkingDirectory</key>
@@ -111,6 +104,8 @@ function buildPlist(hour: number, minute: number, cwd: string): string {
   <dict>
     <key>PATH</key>
     <string>${xmlEscape(pathEnv)}</string>
+    <key>NODE</key>
+    <string>${xmlEscape(nodePath)}</string>
   </dict>
 
   <key>StartCalendarInterval</key>
