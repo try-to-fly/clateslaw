@@ -24,6 +24,7 @@ import { notifyCommand } from './commands/notify.js';
 import { configCommand } from './commands/config.js';
 import { navCommand } from './commands/nav.js';
 import { serviceCommand } from './commands/service.js';
+import { launchdCommand } from './commands/launchd.js';
 
 import { readPackageMeta } from './utils/pkg.js';
 
@@ -175,5 +176,6 @@ program.addCommand(notifyCommand);
 program.addCommand(configCommand);
 program.addCommand(navCommand);
 program.addCommand(serviceCommand);
+program.addCommand(launchdCommand);
 
 export { program };

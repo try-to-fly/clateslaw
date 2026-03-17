@@ -10,6 +10,7 @@
 - 充电结束时计算增益并推送
 - 软件更新可用时发送通知
 - 再次开车时计算停车待机损耗
+- 命中固定时间后自动发送当天 daily 截图
 
 相关代码：
 - `src/cli/commands/mqtt.ts`
@@ -67,6 +68,25 @@ tesla mqtt listen --host 127.0.0.1 --port 1883 --car-id 1
 结束：
 - 计算 `+km / +SOC`
 - 更新停车基线，避免把充电增益和停车损耗混在一起
+
+### Daily 截图定时发送
+
+配置项：
+- `navAlert.dailyScreenshotTime`
+- 格式：`HH:mm`，例如 `22:00`
+
+行为：
+- 不走 MQTT 进程内轮询
+- 在 macOS 上会注册一个 `launchd` 定时任务
+- 命中配置时间时，自动发送当天的 daily 截图
+- MQTT 服务 install/start/restart 时会自动同步这个定时任务
+
+示例：
+
+```bash
+tesla config set navAlert.dailyScreenshotTime 22:00
+tesla service restart
+```
 
 ## 调试与模拟
 

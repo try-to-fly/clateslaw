@@ -36,6 +36,21 @@ export type StoredConfig = {
     // Trigger pushes when remaining minutes crosses one of these thresholds.
     thresholdsMinutes?: number[];
 
+    // Locations where routine drive/park pushes should be suppressed.
+    // Use this as an extensible ignore list (e.g. home/company).
+    ignoredLocations?: Array<{
+      name: string;
+      latitude: number;
+      longitude: number;
+      radiusMeters: number;
+      suppressDriveScreenshot?: boolean;
+      suppressParkRecommend?: boolean;
+      suppressParkDelta?: boolean;
+    }>;
+
+    // Auto-send today's daily screenshot at a fixed local time (HH:mm), e.g. 22:00.
+    dailyScreenshotTime?: string;
+
     // Override push routing for navigation alerts only.
     // If not set, falls back to openclaw.channel/openclaw.target.
     openclawChannel?: string;

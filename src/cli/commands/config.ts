@@ -17,6 +17,51 @@ function isBoolean(value: unknown): value is boolean {
   return typeof value === 'boolean';
 }
 
+function normalizeHmTime(value: string): string | null {
+  const trimmed = value.trim();
+  const m = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function isIgnoredLocationArray(
+  value: unknown
+): value is Array<{
+  name: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  suppressDriveScreenshot?: boolean;
+  suppressParkRecommend?: boolean;
+  suppressParkDelta?: boolean;
+}> {
+  return (
+    Array.isArray(value) &&
+    value.every((item) => {
+      if (!item || typeof item !== 'object') return false;
+      const x = item as any;
+      return (
+        typeof x.name === 'string' &&
+        x.name.trim().length > 0 &&
+        typeof x.latitude === 'number' &&
+        Number.isFinite(x.latitude) &&
+        typeof x.longitude === 'number' &&
+        Number.isFinite(x.longitude) &&
+        typeof x.radiusMeters === 'number' &&
+        Number.isFinite(x.radiusMeters) &&
+        x.radiusMeters >= 0 &&
+        (x.suppressDriveScreenshot == null || typeof x.suppressDriveScreenshot === 'boolean') &&
+        (x.suppressParkRecommend == null || typeof x.suppressParkRecommend === 'boolean') &&
+        (x.suppressParkDelta == null || typeof x.suppressParkDelta === 'boolean')
+      );
+    })
+  );
+}
+
 function maskSecret(v: string): string {
   if (v.length <= 8) return '***';
   return `${v.slice(0, 3)}***${v.slice(-3)}`;
@@ -83,7 +128,7 @@ configCommand
   .description('Set a config key')
   .addHelpText(
     'after',
-    `\nExamples:\n  tesla config set openclaw.channel discord\n  tesla config set mqtt.port 1883\n  tesla config set navAlert.enabled true\n  tesla config set navAlert.thresholdsMinutes "[20,15,10,5]"\n  tesla config set navAlert.destinationKeywords "[\\"公司\\",\\"聚橙路文一西路口\\"]"\n\nNotes:\n  - navAlert.enabled must be a JSON boolean: true / false\n  - navAlert.thresholdsMinutes must be a JSON number[]\n  - navAlert.destinationKeywords must be a JSON string[]\n  - Invalid formats will fail fast; no compatibility coercion is applied.\n`
+    `\nExamples:\n  tesla config set openclaw.channel discord\n  tesla config set mqtt.port 1883\n  tesla config set navAlert.enabled true\n  tesla config set navAlert.thresholdsMinutes "[20,15,10,5]"\n  tesla config set navAlert.destinationKeywords "[\\"公司\\",\\"聚橙路文一西路口\\"]"\n  tesla config set navAlert.ignoredLocations "[{\\"name\\":\\"家\\",\\"latitude\\":30.230228,\\"longitude\\":119.996084,\\"radiusMeters\\":1000,\\"suppressDriveScreenshot\\":true,\\"suppressParkRecommend\\":true,\\"suppressParkDelta\\":true}]"\n  tesla config set navAlert.dailyScreenshotTime 22:00\n\nNotes:\n  - navAlert.enabled must be a JSON boolean: true / false\n  - navAlert.thresholdsMinutes must be a JSON number[]\n  - navAlert.destinationKeywords must be a JSON string[]\n  - navAlert.ignoredLocations must be a JSON object[]\n  - navAlert.dailyScreenshotTime must be HH:mm (local time)\n  - Invalid formats will fail fast; no compatibility coercion is applied.\n`
   )
   .argument('<key>', 'Dot-path key, e.g. openclaw.channel')
   .argument('<value>', 'Value')
@@ -122,6 +167,31 @@ configCommand
         key,
         parsed.map((s) => s.trim()).filter(Boolean)
       );
+      return;
+    }
+
+    if (key === 'navAlert.ignoredLocations') {
+      const parsed = parseJsonValue(value);
+      if (!isIgnoredLocationArray(parsed)) throw new Error(`Expected JSON object[] for ${key}`);
+      store.set(
+        key,
+        parsed.map((x) => ({
+          name: x.name.trim(),
+          latitude: x.latitude,
+          longitude: x.longitude,
+          radiusMeters: Math.max(0, Math.round(x.radiusMeters)),
+          suppressDriveScreenshot: x.suppressDriveScreenshot ?? false,
+          suppressParkRecommend: x.suppressParkRecommend ?? false,
+          suppressParkDelta: x.suppressParkDelta ?? false,
+        }))
+      );
+      return;
+    }
+
+    if (key === 'navAlert.dailyScreenshotTime') {
+      const normalized = normalizeHmTime(value);
+      if (!normalized) throw new Error(`Expected HH:mm for ${key}`);
+      store.set(key, normalized);
       return;
     }
 

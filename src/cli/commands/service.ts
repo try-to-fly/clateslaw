@@ -5,6 +5,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { syncDailyScreenshotLaunchAgent } from './launchd.js';
 
 const APP_NAME = 'tesla-mqtt';
 const STORE_NAME = 'tesla-cli';
@@ -104,6 +105,7 @@ async function installService(): Promise<void> {
   const ecosystemPath = writeEcosystemConfig();
   store.set('service.pm2AppName', APP_NAME);
   store.set('service.ecosystemPath', ecosystemPath);
+  store.set('service.repoCwd', process.cwd());
 
   const start = await runPm2(['start', ecosystemPath]);
   if (start.stdout.trim()) process.stdout.write(start.stdout);
@@ -113,19 +115,31 @@ async function installService(): Promise<void> {
   const save = await runPm2(['save']).catch(() => null);
   if (save?.stdout?.trim()) process.stdout.write(save.stdout);
 
+  await syncDailyScreenshotLaunchAgent();
+
   console.log(`Service installed: ${APP_NAME}`);
   console.log(`Ecosystem: ${ecosystemPath}`);
 }
 
 async function simplePm2Action(action: 'start' | 'stop' | 'restart' | 'delete'): Promise<void> {
+  if (action !== 'delete') {
+    const store = new Configstore(STORE_NAME);
+    store.set('service.repoCwd', process.cwd());
+  }
+
   const result = await runPm2([action, APP_NAME]);
   if (result.stdout.trim()) process.stdout.write(result.stdout);
   if (result.stderr.trim()) process.stderr.write(result.stderr);
   if (result.code !== 0) throw new Error(`pm2 ${action} failed with code ${result.code}`);
+
   if (action === 'delete') {
     const save = await runPm2(['save']).catch(() => null);
     if (save?.stdout?.trim()) process.stdout.write(save.stdout);
+    await syncDailyScreenshotLaunchAgent();
+    return;
   }
+
+  await syncDailyScreenshotLaunchAgent();
 }
 
 async function statusService(): Promise<void> {
