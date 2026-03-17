@@ -48,6 +48,20 @@ export function formatTime(dateStr: string): string {
   });
 }
 
+export function formatDurationCompact(minutes: number): string {
+  const rounded = Math.max(0, Math.round(minutes || 0));
+  const hours = Math.floor(rounded / 60);
+  const mins = rounded % 60;
+
+  if (hours > 0 && mins > 0) return `${hours}h${mins}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${mins}m`;
+}
+
+export function formatEnergyCompact(kwh: number): string {
+  return `${kwh.toFixed(1)}kWh`;
+}
+
 /**
  * RGB 颜色插值
  * @param color1 起始颜色 (hex)

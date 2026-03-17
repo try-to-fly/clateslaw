@@ -55,7 +55,8 @@ export default function DrivePage() {
           endLocation={drive.end_location}
           theme={theme}
           bare={true}
-          height="h-56"
+          height="h-[26rem]"
+          fitPadding={[36, 20, 108, 20]}
         />
 
         {/* Hero 数据 + 辅助数据 */}

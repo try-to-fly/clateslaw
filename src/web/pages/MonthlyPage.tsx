@@ -73,52 +73,57 @@ export default function MonthlyPage() {
 
       {/* Route Map */}
       {allPositions && allPositions.length > 0 && (
-        <DailyRouteMap allPositions={allPositions} theme={theme} />
+        <DailyRouteMap
+          allPositions={allPositions}
+          theme={theme}
+          heightClass="h-[30rem]"
+          fitPadding={[32, 18, 128, 18]}
+        />
       )}
 
-      {/* Drive Summary */}
-      {drives.length > 0 && (
+      {/* Drive / Charge Summary */}
+      {(drives.length > 0 || charges.length > 0) && (
         <div className={cardClass}>
-          <div className="px-2.5 py-1 border-b border-[var(--theme-card-border)] flex items-center justify-between">
-            <span className="text-xs font-medium theme-text">🛣️ 行程 ({drives.length})</span>
-            <span className="text-xs" style={{ color: accentColor }}>
-              {stats.totalDistance.toFixed(1)} km
-            </span>
+          <div className="px-2.5 py-1 border-b border-[var(--theme-card-border)] flex items-center justify-between text-xs">
+            <span className="font-medium theme-text">🧾 本月摘要</span>
+            <span className="theme-text-muted">更紧凑，给地图让位</span>
           </div>
-          <div className="px-2.5 py-1.5 grid grid-cols-3 gap-2 text-xs">
-            <div className="text-center">
-              <div className="theme-text-muted">总时长</div>
-              <div className="theme-text font-medium">{formatDuration(stats.totalDuration)}</div>
+          <div className="divide-y divide-[var(--theme-card-border)] text-[11px] leading-tight">
+            <div className="px-2 py-1.5 grid grid-cols-4 gap-2">
+              <div>
+                <div className="theme-text-muted text-[10px]">行程</div>
+                <div className="theme-text font-medium tabular-nums">{stats.totalDrives}</div>
+              </div>
+              <div>
+                <div className="theme-text-muted text-[10px]">里程</div>
+                <div className="font-medium tabular-nums" style={{ color: accentColor }}>{stats.totalDistance.toFixed(1)} km</div>
+              </div>
+              <div>
+                <div className="theme-text-muted text-[10px]">时长</div>
+                <div className="theme-text font-medium">{formatDuration(stats.totalDuration)}</div>
+              </div>
+              <div>
+                <div className="theme-text-muted text-[10px]">效率</div>
+                <div className="theme-text font-medium tabular-nums">{stats.avgEfficiency.toFixed(0)} Wh/km</div>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="theme-text-muted">总能耗</div>
-              <div className="theme-text font-medium">{formatEnergy(stats.totalEnergyUsed)}</div>
-            </div>
-            <div className="text-center">
-              <div className="theme-text-muted">效率</div>
-              <div className="theme-text font-medium">{stats.avgEfficiency.toFixed(0)} Wh/km</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Charge Summary */}
-      {charges.length > 0 && (
-        <div className={cardClass}>
-          <div className="px-2.5 py-1 border-b border-[var(--theme-card-border)] flex items-center justify-between">
-            <span className="text-xs font-medium theme-text">⚡ 充电 ({charges.length})</span>
-            <span className="text-xs" style={{ color: 'var(--theme-success)' }}>
-              +{formatEnergy(stats.totalEnergyAdded)}
-            </span>
-          </div>
-          <div className="px-2.5 py-1.5 grid grid-cols-2 gap-2 text-xs">
-            <div className="text-center">
-              <div className="theme-text-muted">充电次数</div>
-              <div className="theme-text font-medium">{stats.totalCharges}</div>
-            </div>
-            <div className="text-center">
-              <div className="theme-text-muted">充电费用</div>
-              <div className="theme-text font-medium">¥{stats.totalCost.toFixed(2)}</div>
+            <div className="px-2 py-1.5 grid grid-cols-4 gap-2">
+              <div>
+                <div className="theme-text-muted text-[10px]">充电</div>
+                <div className="theme-text font-medium tabular-nums">{stats.totalCharges}</div>
+              </div>
+              <div>
+                <div className="theme-text-muted text-[10px]">补能</div>
+                <div className="font-medium tabular-nums" style={{ color: 'var(--theme-success)' }}>+{formatEnergy(stats.totalEnergyAdded)}</div>
+              </div>
+              <div>
+                <div className="theme-text-muted text-[10px]">驾驶耗能</div>
+                <div className="theme-text font-medium tabular-nums">{formatEnergy(stats.totalEnergyUsed)}</div>
+              </div>
+              <div>
+                <div className="theme-text-muted text-[10px]">费用</div>
+                <div className="theme-text font-medium tabular-nums">¥{stats.totalCost.toFixed(0)}</div>
+              </div>
             </div>
           </div>
         </div>

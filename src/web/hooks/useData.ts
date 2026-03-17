@@ -35,6 +35,12 @@ export interface DailyData {
     totalEnergyUsed: number;
     totalEnergyAdded: number;
   };
+  rangeMeta?: {
+    from?: string;
+    to?: string;
+    days?: number;
+    mapFirst?: boolean;
+  };
   tpms?: {
     fl: number | null;
     fr: number | null;

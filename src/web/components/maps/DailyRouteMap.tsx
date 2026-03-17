@@ -7,9 +7,16 @@ import type { ThemeType } from '../../hooks/useTheme';
 interface DailyRouteMapProps {
   allPositions: DrivePosition[][];
   theme?: ThemeType;
+  heightClass?: string;
+  fitPadding?: [number, number, number, number];
 }
 
-export function DailyRouteMap({ allPositions, theme = 'tesla' }: DailyRouteMapProps) {
+export function DailyRouteMap({
+  allPositions,
+  theme = 'tesla',
+  heightClass = 'h-80',
+  fitPadding = [44, 28, 96, 28],
+}: DailyRouteMapProps) {
   const handleMapReady = useCallback(
     (map: any, AMap: any) => {
       // 过滤掉空轨迹
@@ -147,9 +154,9 @@ export function DailyRouteMap({ allPositions, theme = 'tesla' }: DailyRouteMapPr
         allOverlays.push(endMarker);
       }
 
-      map.setFitView(allOverlays, false, [60, 60, 60, 60]);
+      map.setFitView(allOverlays, false, fitPadding);
     },
-    [allPositions, theme]
+    [allPositions, theme, fitPadding]
   );
 
   const cardClass =
@@ -169,7 +176,7 @@ export function DailyRouteMap({ allPositions, theme = 'tesla' }: DailyRouteMapPr
     <div className={cardClass}>
       <AMapContainer
         onMapReady={handleMapReady}
-        className="h-80 w-full"
+        className={`${heightClass} w-full`}
         theme={theme}
       />
     </div>

@@ -11,9 +11,18 @@ interface DriveRouteProps {
   theme?: ThemeType;
   bare?: boolean;
   height?: string;
+  fitPadding?: [number, number, number, number];
 }
 
-export function DriveRoute({ positions, startLocation, endLocation, theme = 'tesla', bare = false, height = 'h-80' }: DriveRouteProps) {
+export function DriveRoute({
+  positions,
+  startLocation,
+  endLocation,
+  theme = 'tesla',
+  bare = false,
+  height = 'h-80',
+  fitPadding = [44, 24, 88, 24],
+}: DriveRouteProps) {
   const handleMapReady = useCallback(
     (map: any, AMap: any) => {
       if (positions.length === 0) return;
@@ -64,9 +73,9 @@ export function DriveRoute({ positions, startLocation, endLocation, theme = 'tes
       });
       map.add(endMarker);
 
-      map.setFitView([...polylines, startMarker, endMarker], false, [60, 60, 60, 60]);
+      map.setFitView([...polylines, startMarker, endMarker], false, fitPadding);
     },
-    [positions, theme]
+    [positions, theme, fitPadding]
   );
 
   const cardClass = theme === 'cyberpunk'

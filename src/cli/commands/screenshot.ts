@@ -40,6 +40,12 @@ interface DailyData {
     totalEnergyUsed: number;
     totalEnergyAdded: number;
   };
+  rangeMeta?: {
+    from?: string;
+    to?: string;
+    days?: number;
+    mapFirst?: boolean;
+  };
   tpms?: {
     fl: number | null;
     fr: number | null;
@@ -472,7 +478,23 @@ async function getDailyData(
       }
     : undefined;
 
-  return { date: dateStr, drives, charges, allPositions, stats, tpms };
+  let rangeMeta: { from?: string; to?: string; days?: number; mapFirst?: boolean } | undefined;
+  if (customRange) {
+    const fromMs = new Date(customRange.from).getTime();
+    const toMs = new Date(customRange.to).getTime();
+    const days = Number.isFinite(fromMs) && Number.isFinite(toMs)
+      ? Math.max(1, Math.ceil((toMs - fromMs) / (24 * 60 * 60 * 1000)))
+      : undefined;
+
+    rangeMeta = {
+      from: customRange.from,
+      to: customRange.to,
+      days,
+      mapFirst: true,
+    };
+  }
+
+  return { date: dateStr, drives, charges, allPositions, stats, rangeMeta, tpms };
 }
 
 async function getWeeklyData(carId: number, dateStr?: string): Promise<WeeklyData> {
