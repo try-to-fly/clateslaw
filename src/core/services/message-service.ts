@@ -42,6 +42,7 @@ export class MessageService {
     // Long-running PM2 workers must pick up config store route changes without restart.
     const stored = loadStoredConfig();
     const openclaw = stored.openclaw || {};
+    const hasLiveAccount = Object.prototype.hasOwnProperty.call(openclaw, 'account');
 
     return {
       channel:
@@ -52,10 +53,12 @@ export class MessageService {
         typeof openclaw.target === 'string' && openclaw.target.trim()
           ? openclaw.target.trim()
           : config.openclaw.target,
-      account:
-        typeof openclaw.account === 'string' && openclaw.account.trim()
+      // Treat a deleted/cleared optional account in config store as "no account".
+      account: hasLiveAccount
+        ? typeof openclaw.account === 'string' && openclaw.account.trim()
           ? openclaw.account.trim()
-          : config.openclaw.account || '',
+          : ''
+        : config.openclaw.account || '',
     };
   }
 
