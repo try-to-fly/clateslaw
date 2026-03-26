@@ -1,6 +1,7 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { config } from '../../config/index.js';
+import { loadStoredConfig } from '../../config/store.js';
 
 const execAsync = promisify(exec);
 
@@ -37,24 +38,35 @@ function quoteShellArg(arg: string): string {
 }
 
 export class MessageService {
-  private channel: string;
-  private defaultTarget: string;
-  private account?: string;
+  private resolveDefaults(): Required<MessageOptions> {
+    // Long-running PM2 workers must pick up config store route changes without restart.
+    const stored = loadStoredConfig();
+    const openclaw = stored.openclaw || {};
 
-  constructor() {
-    // Central config is loaded via configstore (src/config/index.ts).
-    this.channel = config.openclaw.channel;
-    this.defaultTarget = config.openclaw.target;
-    this.account = config.openclaw.account;
+    return {
+      channel:
+        typeof openclaw.channel === 'string' && openclaw.channel.trim()
+          ? openclaw.channel.trim()
+          : config.openclaw.channel,
+      target:
+        typeof openclaw.target === 'string' && openclaw.target.trim()
+          ? openclaw.target.trim()
+          : config.openclaw.target,
+      account:
+        typeof openclaw.account === 'string' && openclaw.account.trim()
+          ? openclaw.account.trim()
+          : config.openclaw.account || '',
+    };
   }
 
   /**
    * 发送纯文本消息
    */
   async sendText(message: string, options?: MessageOptions): Promise<void> {
-    const target = options?.target || this.defaultTarget;
-    const channel = options?.channel || this.channel;
-    const account = typeof options?.account === 'string' ? options?.account : this.account;
+    const defaults = this.resolveDefaults();
+    const target = options?.target || defaults.target;
+    const channel = options?.channel || defaults.channel;
+    const account = typeof options?.account === 'string' ? options.account : defaults.account;
 
     const accountPart = account ? ` --account ${quoteShellArg(account)}` : '';
     const command =
@@ -80,12 +92,15 @@ export class MessageService {
     mediaPath: string,
     options?: MessageOptions
   ): Promise<void> {
-    const target = options?.target || this.defaultTarget;
+    const defaults = this.resolveDefaults();
+    const target = options?.target || defaults.target;
+    const channel = options?.channel || defaults.channel;
+    const account = typeof options?.account === 'string' ? options.account : defaults.account;
 
-    const accountPart = this.account ? ` --account ${quoteShellArg(this.account)}` : '';
+    const accountPart = account ? ` --account ${quoteShellArg(account)}` : '';
     const command =
       `${proxyEnvPrefix()}openclaw message send${accountPart}` +
-      ` --channel ${quoteShellArg(this.channel)}` +
+      ` --channel ${quoteShellArg(channel)}` +
       ` --target ${quoteShellArg(target)}` +
       ` --message ${quoteShellArg(message)}` +
       ` --media ${quoteShellArg(mediaPath)}`;
