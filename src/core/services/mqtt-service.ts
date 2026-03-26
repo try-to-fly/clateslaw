@@ -16,6 +16,7 @@ import { recommendAroundAndFormat, distanceMeters } from '../utils/amap-recommen
 import { amapReverseGeocode } from '../utils/amap-regeo.js';
 import { config } from '../../config/index.js';
 import { loadNavConfigRealtime } from './nav-config.js';
+import { getConfigStore } from '../../config/store.js';
 
 const execAsync = promisify(exec);
 
@@ -236,7 +237,60 @@ export class MqttService {
     this.schedulePersist();
   }
 
+  private getIgnoredNavLocations(): Array<{
+    name: string;
+    latitude: number;
+    longitude: number;
+    radiusMeters: number;
+    suppressDriveScreenshot?: boolean;
+    suppressParkRecommend?: boolean;
+    suppressParkDelta?: boolean;
+  }> {
+    const store = getConfigStore();
+    const v = store.get('navAlert.ignoredLocations') as unknown;
+    if (!Array.isArray(v)) return [];
+    return v.filter((item) => {
+      if (!item || typeof item !== 'object') return false;
+      const x = item as any;
+      return (
+        typeof x.name === 'string' &&
+        x.name.trim() &&
+        typeof x.latitude === 'number' &&
+        Number.isFinite(x.latitude) &&
+        typeof x.longitude === 'number' &&
+        Number.isFinite(x.longitude) &&
+        typeof x.radiusMeters === 'number' &&
+        Number.isFinite(x.radiusMeters) &&
+        x.radiusMeters >= 0
+      );
+    }) as any;
+  }
+
+  private matchIgnoredNavLocation(): {
+    name: string;
+    latitude: number;
+    longitude: number;
+    radiusMeters: number;
+    suppressDriveScreenshot?: boolean;
+    suppressParkRecommend?: boolean;
+    suppressParkDelta?: boolean;
+  } | null {
+    if (this.lastLatitude == null || this.lastLongitude == null) return null;
+    const current = { latitude: this.lastLatitude, longitude: this.lastLongitude };
+    for (const loc of this.getIgnoredNavLocations()) {
+      const meters = distanceMeters(current, { latitude: loc.latitude, longitude: loc.longitude });
+      if (meters <= loc.radiusMeters) return loc;
+    }
+    return null;
+  }
+
   private triggerDriveScreenshot(): void {
+    const ignored = this.matchIgnoredNavLocation();
+    if (ignored?.suppressDriveScreenshot) {
+      console.log(`行程截图命中忽略区域「${ignored.name}」(${ignored.radiusMeters}m)，跳过`);
+      return;
+    }
+
     const now = Date.now();
     if (now - this.state.lastDriveTrigger < DEBOUNCE_MS) {
       console.log('行程截图触发被防抖，跳过');
@@ -289,6 +343,12 @@ export class MqttService {
   }
 
   private triggerParkRecommend(): void {
+    const ignored = this.matchIgnoredNavLocation();
+    if (ignored?.suppressParkRecommend) {
+      console.log(`停车周边推荐命中忽略区域「${ignored.name}」(${ignored.radiusMeters}m)，跳过`);
+      return;
+    }
+
     const now = Date.now();
 
     const minMs = Number(process.env.PARK_RECOMMEND_MIN_MS ?? String(30 * 60 * 1000));
@@ -781,6 +841,14 @@ export class MqttService {
 
   private async notifyParkDeltaOnDriveStart(): Promise<void> {
     if (!this.state.lastParkStart) return;
+
+    const ignored = this.matchIgnoredNavLocation();
+    if (ignored?.suppressParkDelta) {
+      console.log(`停车->驾驶推送命中忽略区域「${ignored.name}」(${ignored.radiusMeters}m)，跳过`);
+      this.state.lastParkStart = null;
+      this.schedulePersist();
+      return;
+    }
 
     const now = Date.now();
     if (now - this.state.lastParkNotifyTime < PARK_NOTIFY_MIN_MS) {

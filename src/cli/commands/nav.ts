@@ -1,6 +1,16 @@
 import { Command } from 'commander';
 import { getConfigStore } from '../../config/store.js';
 
+type IgnoredLocation = {
+  name: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  suppressDriveScreenshot?: boolean;
+  suppressParkRecommend?: boolean;
+  suppressParkDelta?: boolean;
+};
+
 function readDestinations(): string[] {
   const store = getConfigStore();
   const v = store.get('navAlert.destinationKeywords') as unknown;
@@ -37,6 +47,45 @@ function writeThresholds(list: number[]): void {
   const store = getConfigStore();
   const uniq = Array.from(new Set(list.filter((n) => Number.isFinite(n) && n >= 0).map((n) => Math.round(n))));
   store.set('navAlert.thresholdsMinutes', uniq);
+}
+
+function readIgnoredLocations(): IgnoredLocation[] {
+  const store = getConfigStore();
+  const v = store.get('navAlert.ignoredLocations') as unknown;
+  if (v == null) return [];
+  if (!Array.isArray(v)) {
+    throw new Error('Invalid config: navAlert.ignoredLocations must be an object[]');
+  }
+
+  return v.filter((item) => {
+    if (!item || typeof item !== 'object') return false;
+    const x = item as any;
+    return (
+      typeof x.name === 'string' &&
+      x.name.trim() &&
+      typeof x.latitude === 'number' &&
+      Number.isFinite(x.latitude) &&
+      typeof x.longitude === 'number' &&
+      Number.isFinite(x.longitude) &&
+      typeof x.radiusMeters === 'number' &&
+      Number.isFinite(x.radiusMeters) &&
+      x.radiusMeters >= 0
+    );
+  }) as IgnoredLocation[];
+}
+
+function writeIgnoredLocations(list: IgnoredLocation[]): void {
+  const store = getConfigStore();
+  const normalized = list.map((x) => ({
+    name: x.name.trim(),
+    latitude: x.latitude,
+    longitude: x.longitude,
+    radiusMeters: Math.max(0, Math.round(x.radiusMeters)),
+    suppressDriveScreenshot: x.suppressDriveScreenshot ?? false,
+    suppressParkRecommend: x.suppressParkRecommend ?? false,
+    suppressParkDelta: x.suppressParkDelta ?? false,
+  }));
+  store.set('navAlert.ignoredLocations', normalized);
 }
 
 export const navCommand = new Command('nav').description('Navigation alert config helpers');
@@ -94,6 +143,70 @@ navCommand
           .map((s) => Number(s.trim()))
           .filter((n) => Number.isFinite(n));
         writeThresholds(list);
+        console.log('OK');
+      })
+  );
+
+navCommand
+  .command('ignore')
+  .description('Manage ignored locations for routine push suppression')
+  .addCommand(
+    new Command('list').description('List ignored locations').action(() => {
+      const list = readIgnoredLocations();
+      if (!list.length) {
+        console.log('(empty)');
+        return;
+      }
+      console.log(JSON.stringify(list, null, 2));
+    })
+  )
+  .addCommand(
+    new Command('add')
+      .description('Add or replace an ignored location')
+      .requiredOption('--name <name>', 'Location name')
+      .requiredOption('--lat <latitude>', 'Latitude')
+      .requiredOption('--lng <longitude>', 'Longitude')
+      .requiredOption('--radius <meters>', 'Radius in meters')
+      .option('--suppress-drive-screenshot', 'Suppress drive screenshot push')
+      .option('--suppress-park-recommend', 'Suppress park recommend push')
+      .option('--suppress-park-delta', 'Suppress park delta push')
+      .action((options: {
+        name: string;
+        lat: string;
+        lng: string;
+        radius: string;
+        suppressDriveScreenshot?: boolean;
+        suppressParkRecommend?: boolean;
+        suppressParkDelta?: boolean;
+      }) => {
+        const latitude = Number(options.lat);
+        const longitude = Number(options.lng);
+        const radiusMeters = Number(options.radius);
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(radiusMeters)) {
+          throw new Error('Invalid lat/lng/radius');
+        }
+
+        const list = readIgnoredLocations().filter((x) => x.name !== options.name.trim());
+        list.push({
+          name: options.name.trim(),
+          latitude,
+          longitude,
+          radiusMeters,
+          suppressDriveScreenshot: !!options.suppressDriveScreenshot,
+          suppressParkRecommend: !!options.suppressParkRecommend,
+          suppressParkDelta: !!options.suppressParkDelta,
+        });
+        writeIgnoredLocations(list);
+        console.log('OK');
+      })
+  )
+  .addCommand(
+    new Command('remove')
+      .description('Remove an ignored location by name')
+      .argument('<name>', 'Location name')
+      .action((name: string) => {
+        const list = readIgnoredLocations().filter((x) => x.name !== name.trim());
+        writeIgnoredLocations(list);
         console.log('OK');
       })
   );
